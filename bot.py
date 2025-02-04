@@ -1,24 +1,57 @@
 import os
 import json
 import requests
-import openai  # Used to process natural language commands via an AI model
+import openai
+from web3 import Web3, Account
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
+from telegram.ext import (ApplicationBuilder, CommandHandler, MessageHandler,
+                          CallbackQueryHandler, ContextTypes, filters)
 
 # ------------------------------
 # Configuration and Setup
 # ------------------------------
 
-# Environment variables for secure tokens/keys
+# Environment variables for secure tokens/keys and provider endpoint
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-BUNGEE_API_BASE = "https://api.bungee.exchange"  # Adjust if needed
+WEB3_PROVIDER = os.getenv("WEB3_PROVIDER", "https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID")
+BUNGEE_API_BASE = "https://api.bungee.exchange"
 
-# Setup OpenAI API key
+# Set up OpenAI and Web3 providers
 openai.api_key = OPENAI_API_KEY
+w3 = Web3(Web3.HTTPProvider(WEB3_PROVIDER))
 
-# A simple in-memory storage for pending transactions per user (for demo purposes)
-pending_transactions = {}
+# In-memory storage for user wallets and pending transactions (use a secure database in production)
+user_wallets = {}         # key: Telegram user_id, value: wallet dict {address, private_key}
+pending_transactions = {} # key: Telegram user_id, value: transaction details
+
+# ------------------------------
+# Wallet Functionality
+# ------------------------------
+
+def create_wallet():
+    """Generate a new EVM wallet and return the address and private key."""
+    account = Account.create()
+    return account.address, account.privateKey.hex()
+
+def import_wallet(private_key: str):
+    """Import a wallet from a given private key. Returns the wallet address and validated private key."""
+    try:
+        account = Account.from_key(private_key)
+        return account.address, account.privateKey.hex()
+    except Exception as e:
+        print(f"Error importing wallet: {e}")
+        return None, None
+
+def get_wallet_balance(address: str):
+    """Retrieve the balance (in ETH) for the given address."""
+    try:
+        balance_wei = w3.eth.get_balance(address)
+        balance_eth = w3.fromWei(balance_wei, 'ether')
+        return balance_eth
+    except Exception as e:
+        print(f"Error fetching balance: {e}")
+        return None
 
 # ------------------------------
 # NLP Processing using OpenAI
@@ -27,14 +60,7 @@ pending_transactions = {}
 def parse_command_nlp(text: str):
     """
     Use OpenAI's language model to parse the user's command.
-    The prompt instructs the model to extract:
-    - action (transfer/migrate)
-    - amount
-    - token symbol
-    - source chain
-    - target chain
-    
-    Returns a dictionary with these details or None if parsing fails.
+    Expected keys: action, amount, token, from_chain, to_chain.
     """
     prompt = f"""
 Extract the following information from the command below:
@@ -51,14 +77,12 @@ Return the result as a JSON object with keys: action, amount, token, from_chain,
 """
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-4",  # or another model of your choice
+            model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0  # for deterministic output
+            temperature=0
         )
         content = response["choices"][0]["message"]["content"]
-        # Attempt to parse the JSON response.
         parsed = json.loads(content)
-        # Basic validation: ensure all keys are present
         if all(key in parsed for key in ["action", "amount", "token", "from_chain", "to_chain"]):
             return parsed
     except Exception as e:
@@ -71,8 +95,8 @@ Return the result as a JSON object with keys: action, amount, token, from_chain,
 
 def get_quote(from_chain, to_chain, token, amount):
     """
-    Retrieve a quote for the cross-chain migration.
-    This uses the QuoteController_getQuote endpoint (see :contentReference[oaicite:0]{index=0}).
+    Retrieve a quote for the cross-chain migration using the Bungee API.
+    See the QuoteController_getQuote endpoint in the documentation.
     """
     url = f"{BUNGEE_API_BASE}/quote"
     params = {
@@ -92,7 +116,7 @@ def get_quote(from_chain, to_chain, token, amount):
 def start_migration(route_data):
     """
     Initiate the migration using the ActiveRoutesController_startActiveRoute endpoint.
-    Ensure that route_data has been reviewed by the user before calling.
+    Ensure that route_data has been reviewed by the user.
     """
     url = f"{BUNGEE_API_BASE}/activeRoute/start"
     headers = {"Content-Type": "application/json"}
@@ -105,99 +129,155 @@ def start_migration(route_data):
         return None
 
 # ------------------------------
-# Telegram Bot Handlers with Safety Checks
+# Telegram Bot Handlers
 # ------------------------------
 
-def start(update: Update, context: CallbackContext):
-    update.message.reply_text(
-        "Welcome to the AI Cross-Chain Migration Assistant!\n\n"
-        "Send a command like: 'Transfer 100 DAI from Ethereum to Binance Smart Chain'.\n"
-        "I will preview the transaction before execution."
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Welcome to the AI Cross-Chain Migration Assistant with Wallet Integration!\n\n"
+        "You can manage an EVM-compatible wallet directly here.\n"
+        "Commands:\n"
+        "/createwallet - Create a new wallet\n"
+        "/importwallet <private_key> - Import an existing wallet\n"
+        "/wallet - Show your wallet details and balance\n\n"
+        "To migrate assets, send a command like: 'Transfer 100 DAI from Ethereum to Binance Smart Chain'."
     )
 
-def handle_message(update: Update, context: CallbackContext):
+async def create_wallet_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    address, private_key = create_wallet()
+    user_wallets[user_id] = {"address": address, "private_key": private_key}
+    await update.message.reply_text(
+        f"New wallet created!\nAddress: {address}\nPrivate Key: {private_key}\n\n"
+        "Keep your private key secure and do not share it with anyone."
+    )
+
+async def import_wallet_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    args = context.args
+    if not args:
+        await update.message.reply_text("Please provide your private key. Usage: /importwallet <private_key>")
+        return
+    private_key = args[0]
+    address, valid_key = import_wallet(private_key)
+    if address:
+        user_wallets[user_id] = {"address": address, "private_key": valid_key}
+        await update.message.reply_text(
+            f"Wallet imported successfully!\nAddress: {address}\n"
+            "Keep your private key secure and do not share it with anyone."
+        )
+    else:
+        await update.message.reply_text("Failed to import wallet. Please check your private key and try again.")
+
+async def wallet_details_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    wallet = user_wallets.get(user_id)
+    if not wallet:
+        await update.message.reply_text("No wallet found. Use /createwallet or /importwallet to set up your wallet.")
+        return
+    balance = get_wallet_balance(wallet["address"])
+    await update.message.reply_text(
+        f"Your Wallet Details:\nAddress: {wallet['address']}\nBalance: {balance} ETH"
+    )
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     text = update.message.text
 
-    # Process the command using the NLP AI instead of regex.
+    # Process the cross-chain migration command using NLP.
     command_data = parse_command_nlp(text)
     if not command_data:
-        update.message.reply_text("Sorry, I couldn't understand that command. Please try again with a clearer instruction.")
+        await update.message.reply_text("Sorry, I couldn't understand that command. Please try again with a clearer instruction.")
         return
 
-    # Call Bungee API to get a quote for the migration.
+    # Retrieve a quote from the Bungee API.
     quote = get_quote(command_data["from_chain"], command_data["to_chain"],
                       command_data["token"], command_data["amount"])
     if not quote:
-        update.message.reply_text("Failed to retrieve a quote. Please verify your command details and try again.")
+        await update.message.reply_text("Failed to retrieve a quote. Please verify your command details and try again.")
         return
 
-    # Build a preview message summarizing the intended migration.
+    # Check if the user has a wallet and if it is funded (for demonstration, we check ETH balance).
+    wallet = user_wallets.get(user_id)
+    if not wallet:
+        await update.message.reply_text("Please set up your wallet first using /createwallet or /importwallet.")
+        return
+
+    balance = get_wallet_balance(wallet["address"])
+    if balance is None or balance <= 0:
+        await update.message.reply_text("Your wallet balance is insufficient. Please deposit funds into your wallet first.")
+        return
+
+    # Build a transaction preview with details for safety confirmation.
     preview_message = (
         f"**Transaction Preview**\n"
         f"Action: {command_data['action'].capitalize()}\n"
         f"Amount: {command_data['amount']} {command_data['token']}\n"
         f"From: {command_data['from_chain']}\n"
         f"To: {command_data['to_chain']}\n\n"
+        f"Your Wallet Address: {wallet['address']}\n"
+        f"Wallet Balance: {balance} ETH\n\n"
         f"**Quote Details:**\n{json.dumps(quote, indent=2)}\n\n"
         "Please review these details carefully. "
-        "If everything looks correct, press Confirm to proceed or Cancel to abort."
+        "Press Confirm to proceed or Cancel to abort."
     )
 
-    # Save pending transaction details for later confirmation.
+    # Save the pending transaction details for this user.
     pending_transactions[user_id] = {
         "command_data": command_data,
-        "quote": quote
+        "quote": quote,
+        "wallet": wallet
     }
 
-    # Provide inline keyboard buttons for user confirmation.
+    # Inline keyboard for confirmation.
     keyboard = [
-        [
-            InlineKeyboardButton("Confirm", callback_data="confirm"),
-            InlineKeyboardButton("Cancel", callback_data="cancel")
-        ]
+        [InlineKeyboardButton("Confirm", callback_data="confirm"),
+         InlineKeyboardButton("Cancel", callback_data="cancel")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    update.message.reply_text(preview_message, reply_markup=reply_markup, parse_mode="Markdown")
+    await update.message.reply_text(preview_message, reply_markup=reply_markup, parse_mode="Markdown")
 
-def button_handler(update: Update, context: CallbackContext):
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.from_user.id
-    query.answer()
+    await query.answer()
 
     if user_id not in pending_transactions:
-        query.edit_message_text("No pending transaction found. Please start over.")
+        await query.edit_message_text("No pending transaction found. Please start over.")
         return
 
     if query.data == "cancel":
-        # Remove the pending transaction
         pending_transactions.pop(user_id, None)
-        query.edit_message_text("Transaction cancelled.")
+        await query.edit_message_text("Transaction cancelled.")
     elif query.data == "confirm":
-        # Retrieve stored details
         pending = pending_transactions.pop(user_id)
-        # For added safety, you might re-check the quote details here.
+        # Optionally, re-check the wallet balance or add further safety checks here.
         route_response = start_migration(pending["quote"])
         if route_response:
-            query.edit_message_text(f"Migration started successfully:\n{json.dumps(route_response, indent=2)}")
+            await query.edit_message_text(f"Migration started successfully:\n{json.dumps(route_response, indent=2)}")
         else:
-            query.edit_message_text("Failed to start migration. Please try again later.")
+            await query.edit_message_text("Failed to start migration. Please try again later.")
+
+# ------------------------------
+# Main Entry Point
+# ------------------------------
 
 def main():
-    # Create the Updater and pass it your bot's token.
-    updater = Updater(TELEGRAM_TOKEN, use_context=True)
-    dp = updater.dispatcher
+    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-    # Handlers for commands and messages.
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
-    dp.add_handler(CallbackQueryHandler(button_handler))
-
-    # Start the Bot
-    updater.start_polling()
-    print("Bot is running...")
-    updater.idle()
+    # Wallet management commands.
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("createwallet", create_wallet_handler))
+    application.add_handler(CommandHandler("importwallet", import_wallet_handler))
+    application.add_handler(CommandHandler("wallet", wallet_details_handler))
+    
+    # Cross-chain migration command.
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(CallbackQueryHandler(button_handler))
+    
+    # Run the bot until the user presses Ctrl-C
+    application.run_polling()
 
 if __name__ == "__main__":
     main()
