@@ -1,24 +1,28 @@
 import os
 import json
 import requests
-import openai
+from deepseek import DeepSeekAPI
 from web3 import Web3, Account
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (ApplicationBuilder, CommandHandler, MessageHandler,
                           CallbackQueryHandler, ContextTypes, filters)
+from dotenv import load_dotenv
 
 # ------------------------------
 # Configuration and Setup
 # ------------------------------
 
+load_dotenv()
+
 # Environment variables for secure tokens/keys and provider endpoint
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+INFURA_API_KEY = os.getenv("INFURA_API_KEY")
 WEB3_PROVIDER = os.getenv("WEB3_PROVIDER", "https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID")
 BUNGEE_API_BASE = "https://api.bungee.exchange"
 
 # Set up OpenAI and Web3 providers
-openai.api_key = OPENAI_API_KEY
+deepseek_client = DeepSeekAPI(DEEPSEEK_API_KEY)
 w3 = Web3(Web3.HTTPProvider(WEB3_PROVIDER))
 
 # In-memory storage for user wallets and pending transactions (use a secure database in production)
@@ -31,8 +35,8 @@ pending_transactions = {} # key: Telegram user_id, value: transaction details
 
 def create_wallet():
     """Generate a new EVM wallet and return the address and private key."""
-    account = Account.create()
-    return account.address, account.privateKey.hex()
+    account = w3.eth.account.create()
+    return account.address, w3.to_hex(account.key)
 
 def import_wallet(private_key: str):
     """Import a wallet from a given private key. Returns the wallet address and validated private key."""
@@ -57,6 +61,9 @@ def get_wallet_balance(address: str):
 # NLP Processing using OpenAI
 # ------------------------------
 
+import json
+import re
+
 def parse_command_nlp(text: str):
     """
     Use OpenAI's language model to parse the user's command.
@@ -76,15 +83,29 @@ If any field is missing or ambiguous, return null.
 Return the result as a JSON object with keys: action, amount, token, from_chain, to_chain.
 """
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0
-        )
-        content = response["choices"][0]["message"]["content"]
-        parsed = json.loads(content)
+        # print(f"Processing NLP command: {text}")
+        print(f"user balance: {deepseek_client.user_balance()}")
+        response = deepseek_client.chat_completion(prompt=prompt)
+        # print(f"NLP Response: {response}")
+        
+        # Extract the JSON part from the Markdown code block
+        json_match = re.search(r'```json\s*({.*?})\s*```', response, re.DOTALL)
+        if not json_match:
+            print("No JSON found in the response.")
+            return None
+        
+        # Get the JSON string
+        json_str = json_match.group(1)
+        
+        # Parse the JSON string into a dictionary
+        parsed = json.loads(json_str)
+        
+        # Check if all required keys are present
         if all(key in parsed for key in ["action", "amount", "token", "from_chain", "to_chain"]):
             return parsed
+        else:
+            print("Missing or ambiguous fields in the parsed response")
+            return None
     except Exception as e:
         print(f"Error parsing command via NLP: {e}")
     return None
