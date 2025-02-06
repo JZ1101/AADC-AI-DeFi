@@ -17,7 +17,7 @@ def import_wallet(private_key: str):
     """Import a wallet from a given private key. Returns the wallet address and validated private key."""
     try:
         account = Account.from_key(private_key)
-        return account.address, account.privateKey.hex()
+        return account.address, w3.to_hex(account.key)
     except Exception as e:
         print(f"Error importing wallet: {e}")
         return None, None

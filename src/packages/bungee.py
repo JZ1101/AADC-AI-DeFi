@@ -8,6 +8,8 @@ load_dotenv()
 
 BUNGEE_API_KEY = os.getenv("BUNGEE_API_KEY")
 BASE_URL = "https://api.socket.tech/v2"
+WEB3_PROVIDER = os.getenv("WEB3_PROVIDER", "https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID")
+w3 = Web3(Web3.HTTPProvider(WEB3_PROVIDER))
 
 # Token Registry (example structure)
 with open('token_registry.json', 'r') as file:
@@ -127,6 +129,22 @@ def build_transaction(route, sender_address):
     response.raise_for_status()
     return response.json()
 
+
+def get_route_transaction_data(route):
+    """Fetch transaction data for a given route."""
+    url = f"{BASE_URL}/build-tx"
+    headers = {
+        "API-KEY": BUNGEE_API_KEY,
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    body = json.dumps({"route": route})
+    print(f"body")
+    response = requests.post(url, headers=headers, data=body)
+    print(f"response: {response}")
+
+    return response.json()
+
 def check_allowance(chain_id, owner, allowance_target, token_address):
     """Check allowance with validated addresses."""
     owner = Web3.to_checksum_address(owner)
@@ -173,3 +191,78 @@ def get_bridge_status(transaction_hash, from_chain_id, to_chain_id):
     response = requests.get(url, headers=get_bungee_headers(), params=params)
     response.raise_for_status()
     return response.json()
+
+
+# ------------------------------
+# Transaction Execution Logic
+# ------------------------------
+
+async def execute_transaction(user_id, route, private_key, user_wallets):
+    """Execute the cross-chain transaction."""
+    try:
+        # Fetch transaction data
+        print(f"here")
+        api_return_data = get_route_transaction_data(route)
+        approval_data = api_return_data.get("result", {}).get("approvalData")
+
+        print(f"Transaction Data: {api_return_data}")
+
+        # Handle token approval if required
+        if approval_data:
+            allowance_target = approval_data["allowanceTarget"]
+            minimum_approval_amount = int(approval_data["minimumApprovalAmount"], 16)
+            from_chain_id = route["fromChainId"]
+            from_token_address = route["fromTokenAddress"]
+
+            # Check current allowance
+            allowance_check = check_allowance(from_chain_id, user_wallets[user_id]["address"], allowance_target, from_token_address)
+            current_allowance = int(allowance_check.get("result", {}).get("value", "0x0"), 16)
+
+            if current_allowance < minimum_approval_amount:
+                # Fetch approval transaction data
+                approval_tx_data = get_approval_transaction_data(
+                    from_chain_id,
+                    user_wallets[user_id]["address"],
+                    allowance_target,
+                    from_token_address,
+                    minimum_approval_amount,
+                )
+
+                # Build and send approval transaction
+                approval_tx = {
+                    "to": approval_tx_data["result"]["to"],
+                    "data": approval_tx_data["result"]["data"],
+                    "value": 0,
+                    "gas": 200000,  # Adjust gas limit as needed
+                    "nonce": w3.eth.get_transaction_count(user_wallets[user_id]["address"]),
+                    "chainId": from_chain_id,
+                }
+                signed_approval_tx = w3.eth.account.sign_transaction(approval_tx, private_key)
+                approval_tx_hash = w3.eth.send_raw_transaction(signed_approval_tx.rawTransaction)
+                print(f"Approval Transaction Hash: {w3.toHex(approval_tx_hash)}")
+
+        # Get the current gas price
+        gas_price = w3.eth.gas_price
+        tx_data = api_return_data["result"]
+        gas_estimate = w3.eth.estimate_gas({
+            'from': user_wallets[user_id]["address"],
+            'to': tx_data['txTarget'],
+            'value': tx_data['value'],
+            'data': tx_data['txData'],
+            'gasPrice': gas_price,
+        })
+        transaction = {
+            'from': user_wallets[user_id]["address"],
+            'to': tx_data['txTarget'],
+            'value': tx_data['value'],
+            'data': tx_data['txData'],
+            'gasPrice': gas_price,
+            'gas': gas_estimate,
+        }
+        
+        signed_main_tx = w3.eth.account.sign_transaction(transaction, private_key)
+        main_tx_hash = w3.eth.send_raw_transaction(signed_main_tx.rawTransaction)
+        return w3.toHex(main_tx_hash)
+
+    except Exception as e:
+        raise Exception(f"Transaction execution failed: {str(e)}")

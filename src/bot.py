@@ -9,7 +9,7 @@ from telegram.ext import (
 from dotenv import load_dotenv
 from packages.wallet import create_wallet, import_wallet, get_wallet_balance
 from packages.nlp import parse_command_nlp
-from packages.bungee import get_quote, build_transaction, CHAIN_IDS, get_token_address
+from packages.bungee import get_quote, CHAIN_IDS, get_token_address, execute_transaction
 
 # ------------------------------
 # Configuration and Setup
@@ -192,66 +192,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("❌ Transaction cancelled.")
         return
 
-    # Process confirmation
+    # Execute the transaction
     pending = pending_transactions.pop(user_id)
-    
-    # Retrieve user's wallet data
-    user_wallet_data = user_wallets.get(user_id)
-    if not user_wallet_data:
-        await query.edit_message_text("❌ Wallet not found. Please create or import a wallet first.")
-        return
-
-    private_key = user_wallet_data["private_key"]
-    address = user_wallet_data["address"]
+    private_key = user_wallets[user_id]["private_key"]
+    route = pending["quote"]["result"]["routes"][0]
 
     try:
-        # Extract transaction details from the quote
-        route = pending["quote"]["result"]["routes"][0]
-        user_tx = route["userTxs"][0]
-        step = user_tx["steps"][0]
-        tx_info = step["transaction"]
-
-        # Get chain ID from original command
-        from_chain_name = pending["command_data"]["from_chain"]
-        from_chain_id = CHAIN_IDS[from_chain_name]
-
-        # Convert hex values to integers
-        value = int(tx_info.get("value", "0x0"), 16)
-        gas_limit = int(tx_info.get("gasLimit", "0x0"), 16)
-        
-        # Build transaction dictionary
-        transaction = {
-            'to': tx_info["to"],
-            'data': tx_info["data"],
-            'value': value,
-            'gas': gas_limit,
-            'nonce': w3.eth.get_transaction_count(address),
-            'chainId': from_chain_id,
-        }
-
-        # Handle EIP-1559 vs legacy transactions
-        if "maxFeePerGas" in tx_info and "maxPriorityFeePerGas" in tx_info:
-            transaction.update({
-                'maxFeePerGas': int(tx_info["maxFeePerGas"], 16),
-                'maxPriorityFeePerGas': int(tx_info["maxPriorityFeePerGas"], 16),
-            })
-        else:
-            transaction['gasPrice'] = int(tx_info.get("gasPrice", "0x0"), 16) or w3.eth.gas_price
-
-        # Sign and send transaction
-        signed_tx = w3.eth.account.sign_transaction(transaction, private_key)
-        tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
-        tx_hash_hex = w3.toHex(tx_hash)
-
+        tx_hash = await execute_transaction(user_id, route, private_key, user_wallets)
         message = (
             f"✅ Transaction submitted successfully!\n"
-            f"Hash: {tx_hash_hex}\n"
-            f"Track on: https://explorer.bungee.exchange/tx/{tx_hash_hex}"
+            f"Hash: {tx_hash}\n"
+            f"Track on: https://explorer.bungee.exchange/tx/{tx_hash}"
         )
     except Exception as e:
         message = f"❌ Transaction failed: {str(e)}"
-        if "insufficient funds" in str(e).lower():
-            message += "\n\nPlease ensure your wallet has enough ETH for gas fees."
 
     await query.edit_message_text(message)
 
