@@ -1,3 +1,4 @@
+
 import os
 from deepseek import DeepSeekAPI
 from web3 import Web3
@@ -149,6 +150,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ No routes available for the provided parameters.")
         return
 
+    # Extract the first route from the quote
+    route = quote["result"]["routes"][0]
+    used_bridge_names = route.get("usedBridgeNames", [])
+    bridge_names = ", ".join(used_bridge_names) if used_bridge_names else "N/A"
+
     # Build a preview message
     preview_message = (
         f"🚀 Cross-Chain Transfer Preview:\n"
@@ -157,6 +163,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"• Amount: {amount} {from_token_symbol}\n"
         f"• From Token Address: {from_token_address}\n"
         f"• To Token Address: {to_token_address}\n\n"
+        f"**Available Bridge Routes:**\n{bridge_names}\n\n"
         "Confirm to proceed with this transaction."
     )
 
@@ -202,7 +209,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message = (
             f"✅ Transaction submitted successfully!\n"
             f"Hash: {tx_hash}\n"
-            f"Track on: https://explorer.bungee.exchange/tx/{tx_hash}"
+            f"Track on: https://www.socketscan.io/tx/{tx_hash}"
         )
     except Exception as e:
         message = f"❌ Transaction failed: {str(e)}"
