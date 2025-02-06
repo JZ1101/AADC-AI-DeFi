@@ -1,4 +1,9 @@
 """
+------------------------------------------------------------------------
+Yield Farming with YieldYak
+------------------------------------------------------------------------
+"""
+"""
 Example usage:
 yieldyak_manager = YieldYakManager(RPC_URL)
 farms = await yieldyak_manager.get_farms()

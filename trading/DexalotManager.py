@@ -1,4 +1,9 @@
 """
+------------------------------------------------------------------------------------------------------------------------
+Liquidity Provision with Dexalot
+------------------------------------------------------------------------------------------------------------------------
+"""
+"""
 Fetching available liquidity pools (get_liquidity_pools())
 Checking user LP balances (get_user_lp_balances())
 Adding liquidity (add_liquidity())
