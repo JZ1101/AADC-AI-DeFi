@@ -7,9 +7,9 @@ from telegram.ext import (
     CallbackQueryHandler, ContextTypes, filters
 )
 from dotenv import load_dotenv
-from wallet import create_wallet, import_wallet, get_wallet_balance
-from nlp import parse_command_nlp
-from bungee import get_quote, build_transaction
+from packages.wallet import create_wallet, import_wallet, get_wallet_balance
+from packages.nlp import parse_command_nlp
+from packages.bungee import get_quote, build_transaction, CHAIN_IDS, get_token_address
 
 # ------------------------------
 # Configuration and Setup
@@ -94,74 +94,76 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Couldn't understand command. Try: 'Transfer 100 USDC from Ethereum to Binance Smart Chain'")
         return
 
-    # Example mapping: Convert chain names to chain IDs and token symbol to contract address as required.
-    # For simplicity, assume command_data["from_chain"] and ["to_chain"] are valid and mapped here.
-    chain_ids = {
-        "Ethereum": 1,
-        "Binance Smart Chain": 56,
-        "Polygon": 137,
-        "Avalanche": 43114,
-        "Arbitrum": 42161,
-        "Optimism": 10,
-        "Base": 8453
-    }
-    # Similarly, assume a token address mapping for demonstration:
-    token_addresses = {
-        "USDC": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",  # Example: USDC on Polygon
-        "USDT": "0x55d398326f99059fF775485246999027B3197955"   # Example: USDT on BSC
-    }
+    # Extract command data
+    from_chain_name = command_data.get("from_chain")
+    to_chain_name = command_data.get("to_chain")
+    from_token_symbol = command_data.get("from_token")
+    to_token_symbol = command_data.get("to_token")
+    amount = command_data.get("amount")
 
-    from_chain_id = chain_ids.get(command_data["from_chain"])
-    to_chain_id = chain_ids.get(command_data["to_chain"])
-    token = command_data["token"]
-    from_token_address = token_addresses.get(token)
-    to_token_address = token_addresses.get(token)  # Adjust if different tokens on each chain
-    amount = command_data["amount"]
-
-    if not all([from_chain_id, to_chain_id, from_token_address, to_token_address]):
-        await update.message.reply_text("❌ Could not map chain or token information correctly.")
+    # Validate chain names
+    from_chain_id = CHAIN_IDS.get(from_chain_name)
+    to_chain_id = CHAIN_IDS.get(to_chain_name)
+    if not from_chain_id or not to_chain_id:
+        await update.message.reply_text("❌ Invalid chain name. Supported chains: Ethereum, Binance Smart Chain, Polygon, Avalanche, Arbitrum, Optimism, Base.")
         return
+
+    # Fetch token addresses from the registry
+    try:
+        from_token_address = get_token_address(from_chain_id, from_token_symbol)
+        to_token_address = get_token_address(to_chain_id, to_token_symbol)
+    except ValueError as e:
+        await update.message.reply_text(f"❌ {str(e)}")
+        return
+
+    # Get user wallet address
+    user_wallet = user_wallets.get(user_id, {}).get("address")
+    if not user_wallet:
+        await update.message.reply_text("⚠️ Please create/import a wallet first!")
+        return
+
+    print(f"Migration request: {from_chain_name} -> {to_chain_name} | {amount} {from_token_symbol} -> {to_token_symbol}")
+    print(f"From Token Address: {from_token_address}")
+    print(f"To Token Address: {to_token_address}")
+    print(f"User Wallet: {user_wallet}")
+    print(f"Command Data: {command_data}")
 
     # Get Bungee quote
     try:
         quote = get_quote(
-            from_chain_id,
-            from_token_address,
-            to_chain_id,
-            to_token_address,
-            amount,
-            user_wallets.get(user_id, {}).get("address", ""),
+            from_chain_id=from_chain_id,
+            from_token_address=from_token_address,
+            to_chain_id=to_chain_id,
+            to_token_address=to_token_address,
+            from_amount=amount,
+            user_address=user_wallet,
             unique_routes_per_bridge=True,
             sort="output",
             single_tx_only=True
         )
     except Exception as e:
-        await update.message.reply_text(f"❌ Failed to get migration quote: {e}")
+        await update.message.reply_text(f"❌ Failed to get migration quote: {str(e)}")
         return
 
     if not quote.get("result", {}).get("routes"):
         await update.message.reply_text("❌ No routes available for the provided parameters.")
         return
 
-    # Verify wallet exists
-    wallet = user_wallets.get(user_id)
-    if not wallet:
-        await update.message.reply_text("⚠️ Please create/import a wallet first!")
-        return
-
     # Build a preview message
     preview_message = (
         f"🚀 Cross-Chain Transfer Preview:\n"
-        f"• From: {command_data['from_chain']}\n"
-        f"• To: {command_data['to_chain']}\n"
-        f"• Amount: {amount} {token}\n\n"
+        f"• From: {from_chain_name} (Chain ID: {from_chain_id})\n"
+        f"• To: {to_chain_name} (Chain ID: {to_chain_id})\n"
+        f"• Amount: {amount} {from_token_symbol}\n"
+        f"• From Token Address: {from_token_address}\n"
+        f"• To Token Address: {to_token_address}\n\n"
         "Confirm to proceed with this transaction."
     )
 
     # Save pending transaction details
     pending_transactions[user_id] = {
         "quote": quote,
-        "wallet": wallet,
+        "wallet": user_wallet,
         "command_data": command_data
     }
 
@@ -192,29 +194,64 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Process confirmation
     pending = pending_transactions.pop(user_id)
-    wallet = pending["wallet"]
-
-    # Build final transaction using the route from the quote
-    tx_data = build_transaction(
-        route=pending["quote"]["result"]["routes"][0],
-        sender_address=wallet["address"]
-    )
-    if not tx_data:
-        await query.edit_message_text("❌ Failed to build transaction.")
+    
+    # Retrieve user's wallet data
+    user_wallet_data = user_wallets.get(user_id)
+    if not user_wallet_data:
+        await query.edit_message_text("❌ Wallet not found. Please create or import a wallet first.")
         return
 
-    # Execute transaction on-chain using Web3 (this example assumes synchronous send, but in production handle exceptions)
+    private_key = user_wallet_data["private_key"]
+    address = user_wallet_data["address"]
+
     try:
-        signed_tx = w3.eth.account.sign_transaction(tx_data["result"]["transaction"], wallet["private_key"])
+        # Extract transaction details from the quote
+        route = pending["quote"]["result"]["routes"][0]
+        user_tx = route["userTxs"][0]
+        step = user_tx["steps"][0]
+        tx_info = step["transaction"]
+
+        # Get chain ID from original command
+        from_chain_name = pending["command_data"]["from_chain"]
+        from_chain_id = CHAIN_IDS[from_chain_name]
+
+        # Convert hex values to integers
+        value = int(tx_info.get("value", "0x0"), 16)
+        gas_limit = int(tx_info.get("gasLimit", "0x0"), 16)
+        
+        # Build transaction dictionary
+        transaction = {
+            'to': tx_info["to"],
+            'data': tx_info["data"],
+            'value': value,
+            'gas': gas_limit,
+            'nonce': w3.eth.get_transaction_count(address),
+            'chainId': from_chain_id,
+        }
+
+        # Handle EIP-1559 vs legacy transactions
+        if "maxFeePerGas" in tx_info and "maxPriorityFeePerGas" in tx_info:
+            transaction.update({
+                'maxFeePerGas': int(tx_info["maxFeePerGas"], 16),
+                'maxPriorityFeePerGas': int(tx_info["maxPriorityFeePerGas"], 16),
+            })
+        else:
+            transaction['gasPrice'] = int(tx_info.get("gasPrice", "0x0"), 16) or w3.eth.gas_price
+
+        # Sign and send transaction
+        signed_tx = w3.eth.account.sign_transaction(transaction, private_key)
         tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
         tx_hash_hex = w3.toHex(tx_hash)
+
         message = (
             f"✅ Transaction submitted successfully!\n"
             f"Hash: {tx_hash_hex}\n"
             f"Track on: https://explorer.bungee.exchange/tx/{tx_hash_hex}"
         )
     except Exception as e:
-        message = f"❌ Transaction failed: {e}"
+        message = f"❌ Transaction failed: {str(e)}"
+        if "insufficient funds" in str(e).lower():
+            message += "\n\nPlease ensure your wallet has enough ETH for gas fees."
 
     await query.edit_message_text(message)
 

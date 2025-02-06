@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 WEB3_PROVIDER = os.getenv("WEB3_PROVIDER", "https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID")
 w3 = Web3(Web3.HTTPProvider(WEB3_PROVIDER))
 # ------------------------------
-# Wallet Functionality (as in original code)
+# Wallet Functionality 
 # ------------------------------
 
 def create_wallet():
