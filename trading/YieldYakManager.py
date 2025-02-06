@@ -1,7 +1,3 @@
-from web3 import Web3
-from typing import Dict, List
-import json
-import requests
 """
 Example usage:
 yieldyak_manager = YieldYakManager(RPC_URL)
@@ -17,6 +13,11 @@ deposits = await yieldyak_manager.get_user_deposits(wallet_address)
 6 Fetching APY estimates (get_farm_apy())
 7 Getting token USD value (get_token_value_usd())
 """
+from web3 import Web3
+from typing import Dict, List
+import json
+import requests
+
 class YieldYakManager:
     YIELDYAK_CONTRACTS = {
         "router": "0xC4729E56b831d74bBc18797e0e17A295fA77488c",
