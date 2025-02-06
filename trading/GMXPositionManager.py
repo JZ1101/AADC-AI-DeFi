@@ -1,3 +1,28 @@
+"""
+------------------------------------------------------------------------
+Psoition Management for GMX 
+------------------------------------------------------------------------
+"""
+"""
+1 Position Management
+1.1 fetch_existing_positions(wallet_address) – Fetches all open positions with on-chain data
+1.2 _get_position(position_id) – Internal function to retrieve a specific position
+1.3 check_liquidation_risk(wallet_address) – Checks positions nearing liquidation
+
+2 Trading Execution
+2.1 preview_open_position(wallet_address, token_address, is_long, size_usd, collateral_usd) – Gets preview details before opening a position
+2.2 open_position(wallet_address, preview_data, private_key) – Opens a position on GMX
+
+2.3 preview_leverage_adjustment(position_id, new_leverage) – Simulates leverage change before execution
+2.4 adjust_leverage(wallet_address, position_id, preview_data, private_key) – Adjusts leverage for an open position
+
+2.5 preview_close_position(position_id) – Simulates closing a position
+2.6 close_position(wallet_address, position_id, private_key) – Closes a position on GMX
+
+3️ Risk & Fees Monitoring
+3.1 get_position_health(position_id) – Calculates health factor, risk score, and distance to liquidation
+3.2 get_trading_fees(position_id) – Retrieves borrowing fees, trading fees, and funding fees
+"""
 from web3 import Web3
 from typing import Dict, List, Optional
 import json
