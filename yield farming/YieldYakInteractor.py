@@ -47,7 +47,8 @@ class YieldYakInteractor:
         transaction = self.contract.functions.deposit(amount).build_transaction(tx_params)
         
         signed_tx = self.w3.eth.account.sign_transaction(transaction, self.account.key)
-        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+
         return self.w3.eth.wait_for_transaction_receipt(tx_hash)
 
     def withdraw(self, amount: int):
@@ -59,7 +60,8 @@ class YieldYakInteractor:
         transaction = self.contract.functions.withdraw(amount).build_transaction(tx_params)
         
         signed_tx = self.w3.eth.account.sign_transaction(transaction, self.account.key)
-        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+
         return self.w3.eth.wait_for_transaction_receipt(tx_hash)
 
     def reinvest(self):
@@ -71,13 +73,14 @@ class YieldYakInteractor:
         transaction = self.contract.functions.reinvest().build_transaction(tx_params)
         
         signed_tx = self.w3.eth.account.sign_transaction(transaction, self.account.key)
-        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+
         return self.w3.eth.wait_for_transaction_receipt(tx_hash)
 
     def check_reward(self) -> int:
         """Check pending rewards."""
         return self.contract.functions.checkReward().call()
-
+    
     def get_total_deposits(self) -> int:
         """Get total deposits in the strategy."""
         return self.contract.functions.totalDeposits().call()
@@ -85,4 +88,8 @@ class YieldYakInteractor:
     def estimate_deployed_balance(self) -> int:
         """Estimate the deployed balance."""
         return self.contract.functions.estimateDeployedBalance().call()
+    def check_user_staked_balance(self) -> int:
+        """Get the user's staked balance in the Yield Yak strategy."""
+        return self.contract.functions.balanceOf(self.account.address).call()
 
+        
