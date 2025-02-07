@@ -5,7 +5,7 @@ def main():
     # Initialize Yield Yak Interactor
     strategy = YieldYakInteractor(
         rpc_url="https://api.avax.network/ext/bc/C/rpc",
-        private_key="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",  # Securely store this in ENV!
+        private_key="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", 
         contract_address="0x0C4684086914D5B1525bf16c62a0FF8010AB991A"
     )
 
@@ -18,10 +18,10 @@ def main():
         deposits = strategy.get_total_deposits()
         print(f"Total deposits: {deposits}")
 
-        # Example deposit (uncomment to use)
-        # amount_to_deposit = Web3.to_wei(1, 'ether')
-        # receipt = strategy.deposit(amount_to_deposit)
-        # print(f"Deposit Transaction Hash: {receipt['transactionHash'].hex()}")
+        # Example deposit 
+        amount_to_deposit = Web3.to_wei(1, 'ether')
+        receipt = strategy.deposit(amount_to_deposit)
+        print(f"Deposit Transaction Hash: {receipt['transactionHash'].hex()}")
 
     except Exception as e:
         print(f"Error: {e}")
