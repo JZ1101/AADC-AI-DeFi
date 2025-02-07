@@ -1,4 +1,4 @@
-from yieldyak import YieldYakInteractor
+from YieldYakInteractor import YieldYakInteractor
 from web3 import Web3
 
 def main():
