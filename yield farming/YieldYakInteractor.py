@@ -13,15 +13,15 @@ class YieldYakInteractor:
         # Initialize Web3
         self.w3 = Web3(Web3.HTTPProvider(rpc_url))
         
-        # Contract ABI - Replace with actual ABI
+        # Load ABI from JSON file 
         with open("abis/farm_abi.json", "r") as f:
-            self.abi = json.load(f)
+            self.abi = json.load(f) 
 
-        # Load contract
         self.contract = self.w3.eth.contract(
             address=self.w3.to_checksum_address(contract_address),
-            abi=json.loads(self.abi)
+            abi=self.abi 
         )
+
         
         # Set up account if private key provided
         self.account = None
