@@ -60,7 +60,7 @@ def reinvest_rewards(strategy):
     """Reinvests pending rewards if above the reinvestment threshold."""
     print("\n--- Reinvesting Rewards ---")
     rewards = strategy.get_my_rewards()
-    min_reinvest = Decimal("0.01")  # Replace with actual contract threshold
+    min_reinvest = Web3.from_wei(strategy.contract.functions.MIN_TOKENS_TO_REINVEST().call(), 'ether')
 
     if rewards >= min_reinvest:
         print(f"Reinvesting {rewards} AVAX...")
