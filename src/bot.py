@@ -242,7 +242,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 response_message = (
                     f"💰 **AvaYield Strategy Rewards** 💰\n\n"
                     f"• **Wallet Address:** `{user_wallet}`\n"
-                    f"• **Current Rewards:** {rewards:.4f} AVAX 🏆\n"
+                    f"• **Current Rewards:** {rewards:.3f} AVAX 🏆\n"
                 )
                 await update.message.reply_text(response_message, parse_mode="Markdown")
             except Exception as e:
