@@ -187,7 +187,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
-    if action == "AvaYield_get_total_deposits":
+    elif action.startswith("AvaYield_"):
         user_id = update.message.from_user.id
         user_wallet = user_wallets.get(user_id, {}).get("address")
         private_key = user_wallets.get(user_id, {}).get("private_key")
@@ -208,29 +208,64 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             contract_address=CONTRACT_ADDRESS,
             private_key=private_key
         )
+        if action == "AvaYield_get_total_deposits":
+            try:
+                # 获取钱包 AVAX 余额
+                balance_wei = strategy.w3.eth.get_balance(strategy.account.address)
+                balance_avax = Web3.from_wei(balance_wei, "ether")
 
-        try:
-            # 获取钱包 AVAX 余额
-            balance_wei = strategy.w3.eth.get_balance(strategy.account.address)
-            balance_avax = Web3.from_wei(balance_wei, "ether")
+                # 获取 AvaYield 策略的总存款量
+                total_deposits = strategy.AvaYield_get_total_deposits()
 
-            # 获取 AvaYield 策略的总存款量
-            total_deposits = strategy.AvaYield_get_total_deposits()
+                # 生成交互消息
+                response_message = (
+                    f"💰 **AvaYield Strategy Overview** 💰\n\n"
+                    f"• **Wallet Address:** `{user_wallet}`\n"
+                    f"• **Wallet Balance:** {balance_avax:.4f} AVAX\n"
+                    f"• **Total Deposits in Strategy:** {total_deposits:.4f} AVAX\n"
+                )
 
-            # 生成交互消息
-            response_message = (
-                f"💰 **AvaYield Strategy Overview** 💰\n\n"
-                f"• **Wallet Address:** `{user_wallet}`\n"
-                f"• **Wallet Balance:** {balance_avax:.4f} AVAX\n"
-                f"• **Total Deposits in Strategy:** {total_deposits:.4f} AVAX\n"
-            )
+                await update.message.reply_text(response_message, parse_mode="Markdown")
 
-            await update.message.reply_text(response_message, parse_mode="Markdown")
+            except Exception as e:
+                print(f"\nError occurred: {str(e)}")
+                await update.message.reply_text(f"❌ Error fetching AvaYield data: {str(e)}")
+        elif action == "AvaYield_get_rewards":
+            try:
+                # Check current rewards
+                rewards = strategy.AvaYield_get_rewards()
+                print(f"Current Rewards: {rewards} AVAX")
 
-        except Exception as e:
-            print(f"\nError occurred: {str(e)}")
-            await update.message.reply_text(f"❌ Error fetching AvaYield data: {str(e)}")
+                # 生成交互消息
+                response_message = (
+                    f"💰 **AvaYield Strategy Rewards** 💰\n\n"
+                    f"• **Wallet Address:** `{user_wallet}`\n"
+                    f"• **Current Rewards:** {rewards:.4f} AVAX 🏆\n"
+                )
+                await update.message.reply_text(response_message, parse_mode="Markdown")
+            except Exception as e:
+                print(f"\nError occurred: {str(e)}")
+                await update.message.reply_text(f"❌ Error fetching AvaYield rewards: {str(e)}")
+        elif action == "AvaYield_get_leverage":
+            try:
+                # Check current leverage
+                leverage = strategy.AvaYield_get_leverage()
+                print(f"Current Leverage: {leverage}x")
 
+                # 生成交互消息
+                response_message = (
+                    f"💰 **AvaYield Strategy Leverage** 💰\n\n"
+                    f"• **Wallet Address:** `{user_wallet}`\n"
+                    f"• **Current Leverage:** {leverage:.4f}x 🔥\n"
+                )
+                await update.message.reply_text(response_message, parse_mode="Markdown")
+            except Exception as e:
+                print(f"\nError occurred: {str(e)}")
+                await update.message.reply_text(f"❌ Error fetching AvaYield leverage: {str(e)}")
+        elif action == "AvaYield_deposit":
+            print("\n⚡️ Triggering deposit function...")
+            deposit_amount = float(os.getenv("TEST_DEPOSIT_AMOUNT", "0.01"))
+            print(f"⚡️ Attempting to deposit {deposit_amount} AVAX")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
