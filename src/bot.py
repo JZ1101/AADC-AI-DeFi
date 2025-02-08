@@ -7,6 +7,7 @@ from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
     CallbackQueryHandler, ContextTypes, filters
 )
+from yield_farming.AvaYieldInteractor import AvaYieldInteractor
 from dotenv import load_dotenv
 from packages.wallet import create_wallet, import_wallet, get_wallet_balance
 from packages.nlp import parse_command_nlp
@@ -94,96 +95,142 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not command_data:
         await update.message.reply_text("❌ Couldn't understand command. Try: 'Transfer 100 USDC from Ethereum to Binance Smart Chain'")
         return
-
+    
+    action = command_data.get("action")
+    if action == "transfer":
     # Extract command data
-    from_chain_name = command_data.get("from_chain")
-    to_chain_name = command_data.get("to_chain")
-    from_token_symbol = command_data.get("from_token")
-    to_token_symbol = command_data.get("to_token")
-    amount = command_data.get("amount")
+        from_chain_name = command_data.get("from_chain")
+        to_chain_name = command_data.get("to_chain")
+        from_token_symbol = command_data.get("from_token")
+        to_token_symbol = command_data.get("to_token")
+        amount = command_data.get("amount")
 
-    # Validate chain names
-    from_chain_id = CHAIN_IDS.get(from_chain_name)
-    to_chain_id = CHAIN_IDS.get(to_chain_name)
-    if not from_chain_id or not to_chain_id:
-        await update.message.reply_text("❌ Invalid chain name. Supported chains: Ethereum, Binance Smart Chain, Polygon, Avalanche, Arbitrum, Optimism, Base.")
-        return
+        # Validate chain names
+        from_chain_id = CHAIN_IDS.get(from_chain_name)
+        to_chain_id = CHAIN_IDS.get(to_chain_name)
+        if not from_chain_id or not to_chain_id:
+            await update.message.reply_text("❌ Invalid chain name. Supported chains: Ethereum, Binance Smart Chain, Polygon, Avalanche, Arbitrum, Optimism, Base.")
+            return
 
-    # Fetch token addresses from the registry
-    try:
-        from_token_address = get_token_address(from_chain_id, from_token_symbol)
-        to_token_address = get_token_address(to_chain_id, to_token_symbol)
-    except ValueError as e:
-        await update.message.reply_text(f"❌ {str(e)}")
-        return
+        # Fetch token addresses from the registry
+        try:
+            from_token_address = get_token_address(from_chain_id, from_token_symbol)
+            to_token_address = get_token_address(to_chain_id, to_token_symbol)
+        except ValueError as e:
+            await update.message.reply_text(f"❌ {str(e)}")
+            return
 
-    # Get user wallet address
-    user_wallet = user_wallets.get(user_id, {}).get("address")
-    if not user_wallet:
-        await update.message.reply_text("⚠️ Please create/import a wallet first!")
-        return
+        # Get user wallet address
+        user_wallet = user_wallets.get(user_id, {}).get("address")
+        if not user_wallet:
+            await update.message.reply_text("⚠️ Please create/import a wallet first!")
+            return
 
-    print(f"Migration request: {from_chain_name} -> {to_chain_name} | {amount} {from_token_symbol} -> {to_token_symbol}")
-    print(f"From Token Address: {from_token_address}")
-    print(f"To Token Address: {to_token_address}")
-    print(f"User Wallet: {user_wallet}")
-    print(f"Command Data: {command_data}")
+        print(f"Migration request: {from_chain_name} -> {to_chain_name} | {amount} {from_token_symbol} -> {to_token_symbol}")
+        print(f"From Token Address: {from_token_address}")
+        print(f"To Token Address: {to_token_address}")
+        print(f"User Wallet: {user_wallet}")
+        print(f"Command Data: {command_data}")
 
-    # Get Bungee quote
-    try:
-        quote = get_quote(
-            from_chain_id=from_chain_id,
-            from_token_address=from_token_address,
-            to_chain_id=to_chain_id,
-            to_token_address=to_token_address,
-            from_amount=amount,
-            user_address=user_wallet,
-            unique_routes_per_bridge=True,
-            sort="output",
-            single_tx_only=True
+        # Get Bungee quote
+        try:
+            quote = get_quote(
+                from_chain_id=from_chain_id,
+                from_token_address=from_token_address,
+                to_chain_id=to_chain_id,
+                to_token_address=to_token_address,
+                from_amount=amount,
+                user_address=user_wallet,
+                unique_routes_per_bridge=True,
+                sort="output",
+                single_tx_only=True
+            )
+        except Exception as e:
+            await update.message.reply_text(f"❌ Failed to get migration quote: {str(e)}")
+            return
+
+        if not quote.get("result", {}).get("routes"):
+            await update.message.reply_text("❌ No routes available for the provided parameters.")
+            return
+
+        # Extract the first route from the quote
+        route = quote["result"]["routes"][0]
+        used_bridge_names = route.get("usedBridgeNames", [])
+        bridge_names = ", ".join(used_bridge_names) if used_bridge_names else "N/A"
+
+        # Build a preview message
+        preview_message = (
+            f"🚀 Cross-Chain Transfer Preview:\n"
+            f"• From: {from_chain_name} (Chain ID: {from_chain_id})\n"
+            f"• To: {to_chain_name} (Chain ID: {to_chain_id})\n"
+            f"• Amount: {amount} {from_token_symbol}\n"
+            f"• From Token Address: {from_token_address}\n"
+            f"• To Token Address: {to_token_address}\n\n"
+            f"**Available Bridge Routes:**\n{bridge_names}\n\n"
+            "Confirm to proceed with this transaction."
         )
-    except Exception as e:
-        await update.message.reply_text(f"❌ Failed to get migration quote: {str(e)}")
-        return
 
-    if not quote.get("result", {}).get("routes"):
-        await update.message.reply_text("❌ No routes available for the provided parameters.")
-        return
+        # Save pending transaction details
+        pending_transactions[user_id] = {
+            "quote": quote,
+            "wallet": user_wallet,
+            "command_data": command_data
+        }
 
-    # Extract the first route from the quote
-    route = quote["result"]["routes"][0]
-    used_bridge_names = route.get("usedBridgeNames", [])
-    bridge_names = ", ".join(used_bridge_names) if used_bridge_names else "N/A"
+        # Confirmation buttons
+        keyboard = [[
+            InlineKeyboardButton("✅ Confirm", callback_data="confirm"),
+            InlineKeyboardButton("❌ Cancel", callback_data="cancel")
+        ]]
+        await update.message.reply_text(
+            preview_message,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+    if action == "AvaYield_get_total_deposits":
+        user_id = update.message.from_user.id
+        user_wallet = user_wallets.get(user_id, {}).get("address")
+        private_key = user_wallets.get(user_id, {}).get("private_key")
 
-    # Build a preview message
-    preview_message = (
-        f"🚀 Cross-Chain Transfer Preview:\n"
-        f"• From: {from_chain_name} (Chain ID: {from_chain_id})\n"
-        f"• To: {to_chain_name} (Chain ID: {to_chain_id})\n"
-        f"• Amount: {amount} {from_token_symbol}\n"
-        f"• From Token Address: {from_token_address}\n"
-        f"• To Token Address: {to_token_address}\n\n"
-        f"**Available Bridge Routes:**\n{bridge_names}\n\n"
-        "Confirm to proceed with this transaction."
-    )
+        if not user_wallet:
+            await update.message.reply_text("⚠️ Please create/import a wallet first!")
+            return
 
-    # Save pending transaction details
-    pending_transactions[user_id] = {
-        "quote": quote,
-        "wallet": user_wallet,
-        "command_data": command_data
-    }
+        # 读取环境变量，设置合约地址和 RPC URL
+        CONTRACT_ADDRESS = os.getenv("AVAYIELD_CONTRACT_ADDRESS", "0x8B414448de8B609e96bd63Dcf2A8aDbd5ddf7fdd")
+        RPC_URL = os.getenv("AVAX_RPC_URL", "https://api.avax.network/ext/bc/C/rpc")
 
-    # Confirmation buttons
-    keyboard = [[
-        InlineKeyboardButton("✅ Confirm", callback_data="confirm"),
-        InlineKeyboardButton("❌ Cancel", callback_data="cancel")
-    ]]
-    await update.message.reply_text(
-        preview_message,
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
-    )
+        print("Initializing AvaYield Strategy Interactor...")
+
+        # 创建 AvaYield 交互对象
+        strategy = AvaYieldInteractor(
+            rpc_url=RPC_URL,
+            contract_address=CONTRACT_ADDRESS,
+            private_key=private_key
+        )
+
+        try:
+            # 获取钱包 AVAX 余额
+            balance_wei = strategy.w3.eth.get_balance(strategy.account.address)
+            balance_avax = Web3.from_wei(balance_wei, "ether")
+
+            # 获取 AvaYield 策略的总存款量
+            total_deposits = strategy.AvaYield_get_total_deposits()
+
+            # 生成交互消息
+            response_message = (
+                f"💰 **AvaYield Strategy Overview** 💰\n\n"
+                f"• **Wallet Address:** `{user_wallet}`\n"
+                f"• **Wallet Balance:** {balance_avax:.4f} AVAX\n"
+                f"• **Total Deposits in Strategy:** {total_deposits:.4f} AVAX\n"
+            )
+
+            await update.message.reply_text(response_message, parse_mode="Markdown")
+
+        except Exception as e:
+            print(f"\nError occurred: {str(e)}")
+            await update.message.reply_text(f"❌ Error fetching AvaYield data: {str(e)}")
+
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query

@@ -32,15 +32,15 @@ def main():
         print(f"\nWallet Balance: {Web3.from_wei(balance, 'ether')} AVAX")
 
         # Check total deposits in the strategy
-        total_deposits = strategy.get_total_deposits()
+        total_deposits = strategy.AvaYield_get_total_deposits()
         print(f"Total Strategy Deposits: {total_deposits} AVAX")
 
         # Check current rewards
-        rewards = strategy.get_rewards()
+        rewards = strategy.AvaYield_get_rewards()
         print(f"Current Rewards: {rewards} AVAX")
 
         # Check current leverage
-        leverage = strategy.get_leverage()
+        leverage = strategy.AvaYield_get_leverage()
         print(f"Current Leverage: {leverage}x")
 
         # Get user's balance in the strategy
@@ -58,7 +58,7 @@ def main():
             balance_before = strategy.w3.eth.get_balance(strategy.account.address)
             
             # Execute deposit
-            receipt = strategy.deposit(deposit_amount)
+            receipt = strategy.AvaYield_deposit(deposit_amount)
             
             if receipt:
                 print(f"✅ Deposit transaction sent! Hash: {receipt['transactionHash'].hex()}")
@@ -81,7 +81,7 @@ def main():
             print(f"Attempting to withdraw {withdraw_amount} shares")
             
             # Execute withdrawal
-            receipt = strategy.withdraw(withdraw_amount)
+            receipt = strategy.AvaYield_withdraw(withdraw_amount)
             if receipt and receipt['status'] == 1:
                 print(f"Withdrawal successful! Transaction hash: {receipt['transactionHash'].hex()}")
                 
@@ -96,7 +96,7 @@ def main():
         should_test_reinvest = os.getenv("TEST_REINVEST", "false").lower() == "true"
         if should_test_reinvest:
             print("\nTesting reinvest functionality...")
-            rewards_before = strategy.get_rewards()
+            rewards_before = strategy.AvaYield_get_rewards()
             
             # Execute reinvest
             receipt = strategy.reinvest()
@@ -105,7 +105,7 @@ def main():
                 
                 # Wait for a few blocks and check new rewards
                 time.sleep(10)  # Wait for next block
-                rewards_after = strategy.get_rewards()
+                rewards_after = strategy.AvaYield_get_rewards()
                 print(f"Rewards before: {rewards_before} AVAX")
                 print(f"Rewards after: {rewards_after} AVAX")
             else:

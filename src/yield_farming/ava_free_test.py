@@ -32,15 +32,15 @@ def main():
         print(f"\nWallet Balance: {Web3.from_wei(balance, 'ether')} AVAX")
 
         # Check total deposits in the strategy
-        total_deposits = strategy.get_total_deposits()
+        total_deposits = strategy.AvaYield_get_total_deposits()
         print(f"Total Strategy Deposits: {total_deposits} AVAX")
 
         # Check current rewards
-        rewards = strategy.get_rewards()
+        rewards = strategy.AvaYield_get_rewards()
         print(f"Current Rewards: {rewards} AVAX")
 
         # Check current leverage
-        leverage = strategy.get_leverage()
+        leverage = strategy.AvaYield_get_leverage()
         print(f"Current Leverage: {leverage}x")
 
         # Get user's balance in the strategy

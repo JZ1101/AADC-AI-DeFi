@@ -5,6 +5,7 @@ from eth_account import Account
 from decimal import Decimal
 
 import json
+import os
 class AvaYieldInteractor:
     def __init__(self, rpc_url, contract_address, private_key=None):
         """
@@ -18,7 +19,8 @@ class AvaYieldInteractor:
         self.w3 = Web3(Web3.HTTPProvider(rpc_url))
         self.contract_address = Web3.to_checksum_address(contract_address)
         
-        with open("abis/ava_yield.json", "r") as f:
+        abi_path = os.path.join(os.path.dirname(__file__), 'abis', 'ava_yield.json')
+        with open(abi_path, "r") as f:
             self.abi = json.load(f) 
 
         self.contract = self.w3.eth.contract(address=self.contract_address, abi=self.abi)
@@ -27,7 +29,7 @@ class AvaYieldInteractor:
         else:
             self.account = None
 
-    def get_total_deposits(self):
+    def AvaYield_get_total_deposits(self):
         """Get total deposits in the strategy"""
         try:
             total = self.contract.functions.totalDeposits().call()
@@ -36,7 +38,7 @@ class AvaYieldInteractor:
             print(f"Error getting total deposits: {e}")
             return None
 
-    def get_rewards(self):
+    def AvaYield_get_rewards(self):
         """Get current rewards"""
         try:
             rewards = self.contract.functions.checkReward().call()
@@ -45,7 +47,7 @@ class AvaYieldInteractor:
             print(f"Error checking rewards: {e}")
             return None
 
-    def get_leverage(self):
+    def AvaYield_get_leverage(self):
         """Get current leverage ratio"""
         try:
             leverage = self.contract.functions.getActualLeverage().call()
@@ -54,7 +56,7 @@ class AvaYieldInteractor:
             print(f"Error getting leverage: {e}")
             return None
 
-    def deposit(self, amount_avax):
+    def AvaYield_deposit(self, amount_avax):
         """
         Deposit AVAX into the strategy
         
@@ -84,7 +86,7 @@ class AvaYieldInteractor:
             print(f"Error depositing: {e}")
             return None
 
-    def withdraw(self, amount_shares):
+    def AvaYield_withdraw(self, amount_shares):
         """
         Withdraw from the strategy
         
@@ -115,7 +117,7 @@ class AvaYieldInteractor:
             print(f"Error withdrawing: {e}")
             return None
 
-    def reinvest(self):
+    def AvaYield_reinvest(self):
         """Reinvest accumulated rewards"""
         if not self.account:
             raise ValueError("Private key not provided - cannot sign transaction")
