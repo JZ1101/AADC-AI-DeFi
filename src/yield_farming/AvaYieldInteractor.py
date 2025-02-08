@@ -43,7 +43,7 @@ class AvaYieldInteractor:
             float: Estimated APR in percentage (%).
         """
         try:
-            # Get total deposits in the strategy pool
+            # Get total deposits (TVL)
             total_deposits = self.contract.functions.totalDeposits().call()
             total_deposits = Web3.from_wei(total_deposits, 'ether')  # Convert to AVAX
 
@@ -51,17 +51,40 @@ class AvaYieldInteractor:
                 print("No deposits in the strategy.")
                 return 0
 
-            # estimated rewards in AVAX
-            pending_rewards = self.contract.functions.checkReward().call()
-            pending_rewards = Web3.from_wei(pending_rewards, 'ether')  # Convert to AVAX
+            # Get estimated daily rewards in AVAX
+            daily_rewards = self.estimate_daily_rewards()
 
-            # Estimate yearly rewards (Assume rewards refresh every 7 days)
-            weeks_per_year = 52
-            estimated_annual_rewards = pending_rewards * weeks_per_year
+            # Estimate yearly rewards (365 days)
+            estimated_annual_rewards = daily_rewards * 365
 
-            # Compute
+            # Compute APR
             apr = (estimated_annual_rewards / total_deposits) * 100  # Convert to percentage
+
+            print(f"🔹 Estimated APR: {apr:.2f}%")
             return apr
+
+        except Exception as e:
+            print(f"Error fetching APR: {e}")
+            return None
+
+    def estimate_daily_rewards(self):
+        """
+        Estimate daily rewards based on the latest `checkReward()` value.
+
+        Returns:
+            float: Estimated daily rewards in AVAX.
+        """
+        try:
+            initial_rewards = self.contract.functions.checkReward().call()
+            initial_rewards = Web3.from_wei(initial_rewards, 'ether')  # Convert to AVAX
+
+            # Assume rewards refresh every ~24 hours
+            return initial_rewards
+
+        except Exception as e:
+            print(f"Error estimating daily rewards: {e}")
+            return 0
+
 
         except Exception as e:
             print(f"Error fetching APR: {e}")
