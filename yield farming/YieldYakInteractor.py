@@ -33,7 +33,7 @@ class YieldYakInteractor:
         return {
             'from': self.account.address,
             'nonce': self.w3.eth.get_transaction_count(self.account.address),
-            'gas': 2000000,  # Adjust as needed
+            'gas': 20000,  # Adjust as needed
             'gasPrice': self.w3.eth.gas_price,
             'value': value
         }
