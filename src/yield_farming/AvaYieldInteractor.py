@@ -33,7 +33,41 @@ class AvaYieldInteractor:
     ----------------------------------------------------------------------------
     READ FUNCTIONS (POOL)
     ----------------------------------------------------------------------------
+    
     """
+    def get_apr(self):
+        """
+        Fetch and calculate the estimated APR using only self.contract.
+
+        Returns:
+            float: Estimated APR in percentage (%).
+        """
+        try:
+            # Get total deposits in the strategy pool
+            total_deposits = self.contract.functions.totalDeposits().call()
+            total_deposits = Web3.from_wei(total_deposits, 'ether')  # Convert to AVAX
+
+            if total_deposits == 0:
+                print("No deposits in the strategy.")
+                return 0
+
+            # estimated rewards in AVAX
+            pending_rewards = self.contract.functions.checkReward().call()
+            pending_rewards = Web3.from_wei(pending_rewards, 'ether')  # Convert to AVAX
+
+            # Estimate yearly rewards (Assume rewards refresh every 7 days)
+            weeks_per_year = 52
+            estimated_annual_rewards = pending_rewards * weeks_per_year
+
+            # Compute
+            apr = (estimated_annual_rewards / total_deposits) * 100  # Convert to percentage
+            return apr
+
+        except Exception as e:
+            print(f"Error fetching APR: {e}")
+            return None
+
+
     def get_pool_deposits(self):
         """Returns the total amount of AVAX deposited in the entire pool"""
         try:
