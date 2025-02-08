@@ -19,7 +19,6 @@ from packages.bungee import get_quote, CHAIN_IDS, get_token_address, execute_tra
 load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 INFURA_API_KEY = os.getenv("INFURA_API_KEY")
 WEB3_PROVIDER = os.getenv("WEB3_PROVIDER", "https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID")
 BUNGEE_API_KEY = os.getenv("BUNGEE_API_KEY")
@@ -27,7 +26,6 @@ BUNGEE_API_KEY = os.getenv("BUNGEE_API_KEY")
 BASE_URL = "https://api.socket.tech/v2"
 
 # Set up DeepSeek and Web3 providers
-deepseek_client = DeepSeekAPI(DEEPSEEK_API_KEY)
 w3 = Web3(Web3.HTTPProvider(WEB3_PROVIDER))
 
 # In-memory storage for user wallets and pending transactions (use a secure database in production)
