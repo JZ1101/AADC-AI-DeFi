@@ -32,7 +32,8 @@ def parse_command_nlp(text: str):
         "withdraw_rewards": [],
         "reinvest_rewards": [],
         "withdraw_partial": ["percentage"],
-        "withdraw_everything": []
+        "withdraw_everything": [],
+        "check_apr":[]
     }
 
     # Generate the prompt dynamically based on the action type
@@ -52,6 +53,7 @@ For each action, the required fields are:
 - reinvest_rewards: no fields required
 - withdraw_partial: percentage
 - withdraw_everything: no fields required
+- check_apr: no fields required
 
 Command: "{text}"
 If any field is missing or ambiguous, return null.

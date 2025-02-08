@@ -296,6 +296,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 print(f"\nError occurred: {str(e)}")
                 await update.message.reply_text(f"❌ Error fetching AvaYield user rewards: {str(e)}")
+        elif action == 'check_apr':
+            try:
+                # Check APR
+                apr = strategy.get_apr()
+                print(f"\nEstimated APR: {apr:.3f}%")
+                # 生成交互消息
+                response_message = (
+                    f"💰 **AvaYield Estimated APR** 💰\n\n"
+                    f"• **Wallet Address:** `{user_wallet}`\n"
+                    f"• **Estimated APR:** {apr}% 💸\n"
+                )
+                await update.message.reply_text(response_message, parse_mode="Markdown")
+            except Exception as e:
+                print(f"\nError occurred: {str(e)}")
+                await update.message.reply_text(f"❌ Error fetching AvaYield APR: {str(e)}")
         elif action == 'deposits':
             amount_avax = command_data.get('amount_avax') # 假设用户输入的是金额
             if not amount_avax:
