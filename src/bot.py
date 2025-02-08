@@ -223,7 +223,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 response_message = (
                     f"💰 **AvaYield Strategy Overview** 💰\n\n"
                     f"• **Wallet Address:** `{user_wallet}`\n"
-                    f"• **Wallet Balance:** {balance_avax:.4f} AVAX\n"
+                    f"• **Wallet Balance:** {balance_avax:.3f} AVAX\n"
                     f"• **Total Deposits in Strategy:** {total_deposits:.4f} AVAX\n"
                 )
 
