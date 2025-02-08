@@ -38,6 +38,9 @@ def main():
 
 
     try:
+        # Check APR
+        apr = strategy.get_apr()
+        print(f"\nEstimated APR: {apr}%")
         # Check wallet balance
         balance = strategy.w3.eth.get_balance(strategy.account.address)
         print(f"\nWallet Balance: {Web3.from_wei(balance, 'ether')} AVAX")
