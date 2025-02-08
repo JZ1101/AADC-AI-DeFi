@@ -1,3 +1,8 @@
+""""
+----------------------------------------------------------------------------
+Write function test case
+----------------------------------------------------------------------------
+"""
 import os
 from dotenv import load_dotenv
 from AvaYieldInteractor import AvaYieldInteractor
@@ -6,6 +11,57 @@ import time
 
 # Load environment variables
 load_dotenv()
+
+"""
+----------------------------------------------------------------------------
+Helper functions
+----------------------------------------------------------------------------
+"""
+def withdraw_everything(strategy):
+    # 1. Check your current rewards
+    rewards = strategy.get_my_rewards()
+    
+    # 2. Reinvest if there are rewards (so they get added to your stake)
+    if rewards > 0:
+        print("Reinvesting rewards before withdrawal...")
+        strategy.reinvest()
+    
+    # 3. Get your current balance in shares
+    shares = strategy.get_my_balance()
+
+    # 4. Withdraw all shares
+    if shares > 0:
+        print(f"Withdrawing all {shares} shares...")
+        strategy.withdraw(shares)
+    else:
+        print("No shares left to withdraw.")
+
+    print("Withdrawal complete.")
+
+def only_claim_rewards(strategy):
+    # 1. Check how much rewards you have
+    rewards = strategy.get_my_rewards()
+
+    # 2. Convert rewards (AVAX) into equivalent shares
+    total_pool_deposits = strategy.get_pool_deposits()
+    total_shares = strategy.contract.functions.totalSupply().call()
+
+    if total_shares == 0 or total_pool_deposits == 0:
+        print("No rewards available to claim.")
+        return
+    
+    # Calculate how many shares represent your rewards
+    reward_shares = (rewards / total_pool_deposits) * total_shares
+
+    # 3. Withdraw that amount of shares to claim rewards
+    if reward_shares > 0:
+        print(f"Withdrawing {reward_shares} shares to claim rewards...")
+        strategy.withdraw(reward_shares)
+    else:
+        print("No rewards available to withdraw.")
+
+    print("Rewards claimed successfully.")
+
 
 def main():
     # Retrieve private key and other configs from .env
@@ -26,28 +82,8 @@ def main():
         private_key=private_key
     )
 
-    try:
-        # Check wallet balance
-        balance = strategy.w3.eth.get_balance(strategy.account.address)
-        print(f"\nWallet Balance: {Web3.from_wei(balance, 'ether')} AVAX")
 
-        # Check total deposits in the strategy
-        total_deposits = strategy.get_total_deposits()
-        print(f"Total Strategy Deposits: {total_deposits} AVAX")
-
-        # Check current rewards
-        rewards = strategy.get_rewards()
-        print(f"Current Rewards: {rewards} AVAX")
-
-        # Check current leverage
-        leverage = strategy.get_leverage()
-        print(f"Current Leverage: {leverage}x")
-
-        # Get user's balance in the strategy
-        user_balance = strategy.contract.functions.balanceOf(strategy.account.address).call()
-        print(f"Your Strategy Balance: {Web3.from_wei(user_balance, 'ether')} shares")
-
-        
+    try:   
         # Optional: Test deposit functionality
         should_test_deposit = os.getenv("TEST_DEPOSIT", "false").lower() == "true"
         if should_test_deposit:

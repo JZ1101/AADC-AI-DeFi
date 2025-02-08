@@ -26,9 +26,13 @@ class AvaYieldInteractor:
             self.account = Account.from_key(private_key)
         else:
             self.account = None
-
-    def get_total_deposits(self):
-        """Get total deposits in the strategy"""
+    """
+    ----------------------------------------------------------------------------
+    READ FUNCTIONS (POOL)
+    ----------------------------------------------------------------------------
+    """
+    def get_pool_deposits(self):
+        """Returns the total amount of AVAX deposited in the entire pool"""
         try:
             total = self.contract.functions.totalDeposits().call()
             return Web3.from_wei(total, 'ether')
@@ -36,8 +40,8 @@ class AvaYieldInteractor:
             print(f"Error getting total deposits: {e}")
             return None
 
-    def get_rewards(self):
-        """Get current rewards"""
+    def get_pool_rewards(self):
+        """total pending AVAX rewards for the contract (pool as a whole), not just your rewards"""
         try:
             rewards = self.contract.functions.checkReward().call()
             return Web3.from_wei(rewards, 'ether')
@@ -53,7 +57,51 @@ class AvaYieldInteractor:
         except Exception as e:
             print(f"Error getting leverage: {e}")
             return None
+    """
+    ----------------------------------------------------------------------------
+    READ FUNCTIONS (INDIVIDUAL)
+    ----------------------------------------------------------------------------
+    """
+    def get_my_balance(self):
+        """Returns the number of shares you own in the staking pool."""
+        try:
+            balance = self.contract.functions.balanceOf(self.account.address).call()
+            return Web3.from_wei(balance, 'ether')
+        except Exception as e:
+            print(f"Error checking balance: {e}")
+            return None
 
+    def get_my_rewards(self):
+        """Returns the estimated pending rewards that belong to YOU."""
+        try:
+            total_rewards = self.contract.functions.checkReward().call()  # Total pool rewards
+            my_shares = self.contract.functions.balanceOf(self.account.address).call()  # Your shares
+            total_shares = self.contract.functions.totalSupply().call()  # Total issued shares
+
+            if total_shares == 0:
+                return 0
+
+            my_rewards = (my_shares / total_shares) * total_rewards
+            return Web3.from_wei(my_rewards, 'ether')
+        except Exception as e:
+            print(f"Error checking your rewards: {e}")
+            return None
+
+    def get_my_leverage(self):
+        """Returns the leverage ratio applied to your staked AVAX."""
+        try:
+            leverage = self.contract.functions.getActualLeverage().call()
+            return leverage / 1e18  # Convert from wei-based decimal format
+        except Exception as e:
+            print(f"Error checking leverage: {e}")
+            return None
+        
+
+    """
+    ----------------------------------------------------------------------------
+    WRITE FUNCTIONS: deposit / withdraw / reinvest
+    ----------------------------------------------------------------------------
+    """
     def deposit(self, amount_avax):
         """
         Deposit AVAX into the strategy
@@ -71,7 +119,7 @@ class AvaYieldInteractor:
                 'from': self.account.address,
                 'value': amount_wei,
                 'nonce': self.w3.eth.get_transaction_count(self.account.address),
-                'gas': 2000000,  # Adjust gas limit as needed
+                'gas': 2000000,  # gas limit
                 'gasPrice': self.w3.eth.gas_price
             })
             
