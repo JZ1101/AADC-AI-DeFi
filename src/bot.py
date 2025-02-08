@@ -274,7 +274,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 response_message = (
                     f"💰 **AvaYield User Balance** 💰\n\n"
                     f"• **Wallet Address:** `{user_wallet}`\n"
-                    f"• **Your Balance:** {Web3.from_wei(user_balance, 'ether')} shares 🚀\n"
+                    f"• **Your Balance:** {Web3.from_wei(user_balance, 'ether'):.3f} shares 🚀\n"
                 )
                 await update.message.reply_text(response_message, parse_mode="Markdown")
             except Exception as e:
@@ -290,7 +290,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 response_message = (
                     f"💰 **AvaYield User Rewards** 💰\n\n"
                     f"• **Wallet Address:** `{user_wallet}`\n"
-                    f"• **Your Rewards:** {Web3.from_wei(user_rewards, 'ether')} AVAX 🏆\n"
+                    f"• **Your Rewards:** {Web3.from_wei(user_rewards, 'ether'):.3f} AVAX 🏆\n"
                 )
                 await update.message.reply_text(response_message, parse_mode="Markdown")
             except Exception as e:
@@ -305,7 +305,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 response_message = (
                     f"💰 **AvaYield Estimated APR** 💰\n\n"
                     f"• **Wallet Address:** `{user_wallet}`\n"
-                    f"• **Estimated APR:** {apr}% 💸\n"
+                    f"• **Estimated APR:** {apr:.3f}% 💸\n"
                 )
                 await update.message.reply_text(response_message, parse_mode="Markdown")
             except Exception as e:
@@ -327,7 +327,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             preview_message = (
                 f"🚀 AVAX Deposit Preview:\n"
                 f"• Amount to Deposit: {amount_avax} AVAX\n"
-                f"• Current Balance: {balance_before_avax} AVAX\n\n"
+                f"• Current Balance: {balance_before_avax:.3f} AVAX\n\n"
                 "Confirm to proceed with this deposit."
             )
 
@@ -356,7 +356,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 preview_message = (
                     f"🚀 Reinvest Rewards Preview:\n"
                     f"• Pending Rewards: {rewards} AVAX\n"
-                    f"• Minimum Required: {min_reinvest} AVAX\n\n"
+                    f"• Minimum Required: {min_reinvest:.3f} AVAX\n\n"
                     "Confirm to proceed with reinvestment."
                 )
 
@@ -381,7 +381,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # Build a preview message
                 preview_message = (
                     f"🚀 Withdraw Rewards Preview:\n"
-                    f"• Pending Rewards: {rewards} AVAX\n\n"
+                    f"• Pending Rewards: {rewards:.3f} AVAX\n\n"
                     "Confirm to proceed with withdrawal."
                 )
 
@@ -417,7 +417,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"🚀 Withdraw Shares Preview:\n"
                     f"• Total Shares: {user_shares}\n"
                     f"• Percentage to Withdraw: {percentage}%\n"
-                    f"• Amount to Withdraw: {withdraw_amount} shares\n\n"
+                    f"• Amount to Withdraw: {withdraw_amount:.3f} shares\n\n"
                     "Confirm to proceed with withdrawal."
                 )
 
@@ -444,7 +444,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             preview_message = (
                 f"🚀 Withdraw Everything Preview:\n"
                 f"• Pending Rewards: {rewards} AVAX\n"
-                f"• Total Shares: {user_shares}\n\n"
+                f"• Total Shares: {user_shares:.3f}\n\n"
                 "Confirm to proceed with reinvesting rewards and withdrawing all shares."
             )
 
