@@ -23,12 +23,14 @@ def parse_command_nlp(text: str):
     # Define possible actions and their required fields
     action_fields = {
         "transfer": ["amount", "from_token", "to_token", "from_chain", "to_chain"],
-        "AvaYield_get_total_deposits": [],
-        "AvaYield_get_rewards": [],
-        "AvaYield_get_leverage": [],
-        "AvaYield_deposit": ["amount_avax"],
-        "AvaYield_withdraw": ["amount_shares"],
-        "AvaYield_reinvest": []
+        "get_pool_deposits": [],
+        "get_pool_rewards": [],
+        "get_my_balance": [],
+        "get_my_rewards": [],
+        "get_leverage": [],
+        "deposits": ["amount_avax"],
+        "withdraw": ["amount_shares"],
+        "reinvest": []
     }
 
     # Generate the prompt dynamically based on the action type
@@ -39,12 +41,13 @@ Extract the following information from the command below:
 
 For each action, the required fields are:
 - transfer: amount, from_token, to_token, from_chain, to_chain
-- AvaYield_get_total_deposits: no fields required
-- AvaYield_get_rewards: no fields required
-- AvaYield_get_leverage: no fields required
-- AvaYield_deposit: amount_avax
-- AvaYield_withdraw: amount_shares
-- AvaYield_reinvest: no fields required
+- get_pool_deposits: no fields required
+- get_pool_rewards: no fields required
+- get_my_balance: no fields required
+- get_leverage: no fields required
+- deposits: amount_avax
+- withdraw: amount_shares
+- reinvest: no fields required
 
 Command: "{text}"
 If any field is missing or ambiguous, return null.
