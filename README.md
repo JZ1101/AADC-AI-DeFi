@@ -34,4 +34,34 @@ DeFi Position Management
 | 1inch | ✔️ |
 | 0x | ✔️ |
 
+#### DeFi - Yield Farming with BENQI
+
+| Name   |  Status  |
+|:-----  |:--------:|
+| Deposit | ✔️ |
+| Withdraw | ✔️ |
+| Reinvest | ✔️ |
+| Contract Info | ✔️ |
+
+## 🚀 DeFi - Yield Farming with BENQI
+
+| **Feature**  | **Status** |
+|:------------|:--------:|
+| **Deposit**  | ✔️ |
+| **Withdraw** | ✔️ |
+| **Reinvest** | ✔️ |
+| **Contract Info** | ✔️ |
+
+---
+
+## 🤖 Bot Abilities
+
+| **Feature**  | **Status** |
+|:------------|:--------:|
+| **Multi-language Support**  | ✔️ |
+| **Telegram Bot Integration** | ✔️ |
+| **DeFi Commands (Swap, Withdraw, APR Check, etc.)** | ✔️ |
+| **Transaction previews** | ✔️ |
+
+
 
