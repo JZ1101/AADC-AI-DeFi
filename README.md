@@ -12,7 +12,7 @@ DeFi Position Management
   - 2.2 Handle yield farming with BENQI through chat interface
   - 2.3 Implement safety checks and transaction previews before execution
 
-#### Bridges Integrated
+## Bridges Integrated
 
 | Name   |  Status  |
 |:-----  |:--------:|
@@ -27,14 +27,14 @@ DeFi Position Management
 | Symbiosis     | ✔️ |
 | Synapse     | ✔️ |
 
-#### DEX Integrated For Cross Chain Atomic Swap
+## DEX Integrated For Cross Chain Atomic Swap
 
 | Name   |  Status  |
 |:-----  |:--------:|
 | 1inch | ✔️ |
 | 0x | ✔️ |
 
-#### DeFi - Yield Farming with BENQI
+## DeFi - Yield Farming with BENQI
 
 | Name   |  Status  |
 |:-----  |:--------:|
@@ -51,8 +51,6 @@ DeFi Position Management
 | **Withdraw** | ✔️ |
 | **Reinvest** | ✔️ |
 | **Contract Info** | ✔️ |
-
----
 
 ## 🤖 Bot Abilities
 
