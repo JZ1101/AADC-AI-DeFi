@@ -417,7 +417,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"🚀 Withdraw Shares Preview:\n"
                     f"• Total Shares: {user_shares}\n"
                     f"• Percentage to Withdraw: {percentage}%\n"
-                    f"• Amount to Withdraw: {withdraw_amount:.3f} shares\n\n"
+                    f"• Amount to Withdraw: {withdraw_amount:.3f} AVAX\n\n"
                     "Confirm to proceed with withdrawal."
                 )
 
@@ -610,13 +610,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # 执行提现操作
         print(f"\n--- Withdrawing {percentage}% of Shares ---")
-        print(f"Withdrawing {withdraw_amount} shares ({percentage}% of total)...")
+        print(f"Withdrawing {withdraw_amount} AVAX ({percentage}% of total)...")
         try:
             strategy.withdraw(withdraw_amount)
             time.sleep(10)  # Wait for transaction confirmation
 
             # 发送成功消息
-            message = f"✅ Withdrawal successful! {withdraw_amount} shares withdrawn."
+            message = f"✅ Withdrawal successful! {withdraw_amount} AVAX withdrawn."
         except Exception as e:
             message = f"❌ Withdrawal failed: {str(e)}"
 
@@ -638,11 +638,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Step 2: Withdraw all shares
         user_shares = Decimal(strategy.get_my_balance())
         if user_shares > 0:
-            print(f"Withdrawing all {user_shares} shares...")
+            print(f"Withdrawing all {user_shares} AVAX...")
             try:
                 strategy.withdraw(user_shares)
                 time.sleep(10)  # Wait for transaction confirmation
-                await query.edit_message_text(f"✅ Full withdrawal successful! {user_shares} shares withdrawn.")
+                await query.edit_message_text(f"✅ Full withdrawal successful! {user_shares} AVAX withdrawn.")
             except Exception as e:
                 await query.edit_message_text(f"❌ Full withdrawal failed: {str(e)}")
         else:
