@@ -22,7 +22,7 @@ def parse_command_nlp(text: str):
     """
     # Define possible actions and their required fields
     action_fields = {
-        "transfer": ["amount", "from_token", "to_token", "from_chain", "to_chain"],
+        "cross_chain_send&transfer": ["amount", "from_token", "to_token", "from_chain", "to_chain"],
         "get_pool_deposits": [],
         "get_pool_rewards": [],
         "get_my_balance": [],
@@ -43,7 +43,7 @@ Extract the following information from the command below:
 - fields: depending on the action, extract the relevant fields from the command.
 
 For each action, the required fields are:
-- transfer: amount, from_token, to_token, from_chain, to_chain
+- cross_chain_send&transfer: amount, from_token, to_token, from_chain, to_chain
 - get_pool_deposits: no fields required
 - get_pool_rewards: no fields required
 - get_my_balance: no fields required
@@ -61,7 +61,7 @@ If any field is missing or ambiguous, return null.
 Return the result as a JSON object with keys: action, and any other relevant fields based on the action.
 Example:
 {{
-    "action": "transfer",
+    "action": "cross_chain_send&transfer",
     "amount": 100,
     "from_token": "AVAX",
     "to_token": "USDC",

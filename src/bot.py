@@ -99,7 +99,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     action = command_data.get("action")
-    if action == "transfer":
+    if action == "cross_chain_send&transfer":
     # Extract command data
         from_chain_name = command_data.get("from_chain")
         to_chain_name = command_data.get("to_chain")
@@ -150,7 +150,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await update.message.reply_text(f"❌ Failed to get migration quote: {str(e)}")
             return
-
+        
         if not quote.get("result", {}).get("routes"):
             await update.message.reply_text("❌ No routes available for the provided parameters.")
             return
