@@ -527,8 +527,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             message = (
                 f"✅ Deposit successful!\n"
                 f"Transaction hash: {receipt['transactionHash'].hex()}\n"
-                f"Track on: https://www.snowtrace.io/tx/{receipt['transactionHash'].hex()}"
-                f"Balance change: {difference} AVAX (includes gas fees)"
+                f"Track on: https://www.snowtrace.io/tx/{receipt['transactionHash'].hex()}\n"
+                f"Balance change: {difference:.3f} AVAX (includes gas fees)"
             )
         except Exception as e:
             message = f"❌ Deposit failed: {str(e)}"
