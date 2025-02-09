@@ -61,5 +61,29 @@ DeFi Position Management
 | **DeFi Commands (Swap, Withdraw, APR Check, etc.)** | ✔️ |
 | **Transaction previews** | ✔️ |
 
+## Implementation Guide
 
+### Step 1: Setting Up the Environment 🚀
+1. Clone the repository:
+  ```bash
+  git clone https://github.com/your-repo/ETH-Oxford-2025.git
+  cd ETH-Oxford-2025
+  ```
 
+2. Install dependencies:
+  ```bash
+  pip install uv
+  cd src
+  uv pip install .
+  ```
+
+### Step 2: Configuring the Environment Variables 🔧
+
+Create a `.env` file in the root directory of the project and add the following parameters:
+```plaintext
+TELEGRAM_TOKEN = "your-telegram-token" # Use Telegram BotFather to create a Telegram bot token
+OPENAI_API_KEY = "your-openai-api-key" # Obtain from https://platform.openai.com/api-keys
+INFURA_API_KEY = "your-infura-api-key" # Obtain from https://developer.metamask.io/
+WEB3_PROVIDER = "your-web3-provider" # Obtain from https://developer.metamask.io/ too, but choose the Infura RPC key
+BUNGEE_API_KEY  = "72a5b4b0-e727-48be-8aa1-5da9d62fe635" # Use the BUNGEE test key, Obtain from https://docs.bungee.exchange/bungee-manual/socket-api/introduction
+```
