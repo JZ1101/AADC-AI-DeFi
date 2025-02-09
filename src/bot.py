@@ -1,5 +1,8 @@
 
 import os
+import time
+from decimal import Decimal
+import asyncio
 from deepseek import DeepSeekAPI
 from web3 import Web3
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -7,6 +10,7 @@ from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
     CallbackQueryHandler, ContextTypes, filters
 )
+from yield_farming.AvaYieldInteractor import AvaYieldInteractor
 from dotenv import load_dotenv
 from packages.wallet import create_wallet, import_wallet, get_wallet_balance
 from packages.nlp import parse_command_nlp
@@ -18,7 +22,6 @@ from packages.bungee import get_quote, CHAIN_IDS, get_token_address, execute_tra
 load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 INFURA_API_KEY = os.getenv("INFURA_API_KEY")
 WEB3_PROVIDER = os.getenv("WEB3_PROVIDER", "https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID")
 BUNGEE_API_KEY = os.getenv("BUNGEE_API_KEY")
@@ -26,12 +29,12 @@ BUNGEE_API_KEY = os.getenv("BUNGEE_API_KEY")
 BASE_URL = "https://api.socket.tech/v2"
 
 # Set up DeepSeek and Web3 providers
-deepseek_client = DeepSeekAPI(DEEPSEEK_API_KEY)
 w3 = Web3(Web3.HTTPProvider(WEB3_PROVIDER))
 
 # In-memory storage for user wallets and pending transactions (use a secure database in production)
 user_wallets = {}         # key: Telegram user_id, value: wallet dict {address, private_key}
 pending_transactions = {} # key: Telegram user_id, value: transaction details
+
 
 # ------------------------------
 # Telegram Bot Handlers (same as original)
@@ -94,128 +97,546 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not command_data:
         await update.message.reply_text("❌ Couldn't understand command. Try: 'Transfer 100 USDC from Ethereum to Binance Smart Chain'")
         return
-
+    
+    action = command_data.get("action")
+    if action == "cross_chain_send&transfer":
     # Extract command data
-    from_chain_name = command_data.get("from_chain")
-    to_chain_name = command_data.get("to_chain")
-    from_token_symbol = command_data.get("from_token")
-    to_token_symbol = command_data.get("to_token")
-    amount = command_data.get("amount")
+        from_chain_name = command_data.get("from_chain")
+        to_chain_name = command_data.get("to_chain")
+        from_token_symbol = command_data.get("from_token")
+        to_token_symbol = command_data.get("to_token")
+        amount = command_data.get("amount")
 
-    # Validate chain names
-    from_chain_id = CHAIN_IDS.get(from_chain_name)
-    to_chain_id = CHAIN_IDS.get(to_chain_name)
-    if not from_chain_id or not to_chain_id:
-        await update.message.reply_text("❌ Invalid chain name. Supported chains: Ethereum, Binance Smart Chain, Polygon, Avalanche, Arbitrum, Optimism, Base.")
-        return
+        # Validate chain names
+        from_chain_id = CHAIN_IDS.get(from_chain_name)
+        to_chain_id = CHAIN_IDS.get(to_chain_name)
+        if not from_chain_id or not to_chain_id:
+            await update.message.reply_text("❌ Invalid chain name. Supported chains: Ethereum, Binance Smart Chain, Polygon, Avalanche, Arbitrum, Optimism, Base.")
+            return
 
-    # Fetch token addresses from the registry
-    try:
-        from_token_address = get_token_address(from_chain_id, from_token_symbol)
-        to_token_address = get_token_address(to_chain_id, to_token_symbol)
-    except ValueError as e:
-        await update.message.reply_text(f"❌ {str(e)}")
-        return
+        # Fetch token addresses from the registry
+        try:
+            from_token_address = get_token_address(from_chain_id, from_token_symbol)
+            to_token_address = get_token_address(to_chain_id, to_token_symbol)
+        except ValueError as e:
+            await update.message.reply_text(f"❌ {str(e)}")
+            return
 
-    # Get user wallet address
-    user_wallet = user_wallets.get(user_id, {}).get("address")
-    if not user_wallet:
-        await update.message.reply_text("⚠️ Please create/import a wallet first!")
-        return
+        # Get user wallet address
+        user_wallet = user_wallets.get(user_id, {}).get("address")
+        if not user_wallet:
+            await update.message.reply_text("⚠️ Please create/import a wallet first!")
+            return
 
-    print(f"Migration request: {from_chain_name} -> {to_chain_name} | {amount} {from_token_symbol} -> {to_token_symbol}")
-    print(f"From Token Address: {from_token_address}")
-    print(f"To Token Address: {to_token_address}")
-    print(f"User Wallet: {user_wallet}")
-    print(f"Command Data: {command_data}")
+        print(f"Migration request: {from_chain_name} -> {to_chain_name} | {amount} {from_token_symbol} -> {to_token_symbol}")
+        print(f"From Token Address: {from_token_address}")
+        print(f"To Token Address: {to_token_address}")
+        print(f"User Wallet: {user_wallet}")
+        print(f"Command Data: {command_data}")
 
-    # Get Bungee quote
-    try:
-        quote = get_quote(
-            from_chain_id=from_chain_id,
-            from_token_address=from_token_address,
-            to_chain_id=to_chain_id,
-            to_token_address=to_token_address,
-            from_amount=amount,
-            user_address=user_wallet,
-            unique_routes_per_bridge=True,
-            sort="output",
-            single_tx_only=True
+        # Get Bungee quote
+        try:
+            quote = get_quote(
+                from_chain_id=from_chain_id,
+                from_token_address=from_token_address,
+                to_chain_id=to_chain_id,
+                to_token_address=to_token_address,
+                from_amount=amount,
+                user_address=user_wallet,
+                unique_routes_per_bridge=True,
+                sort="output",
+                single_tx_only=True
+            )
+        except Exception as e:
+            await update.message.reply_text(f"❌ Failed to get migration quote: {str(e)}")
+            return
+        
+        if not quote.get("result", {}).get("routes"):
+            await update.message.reply_text("❌ No routes available for the provided parameters.")
+            return
+
+        # Extract the first route from the quote
+        route = quote["result"]["routes"][0]
+        used_bridge_names = route.get("usedBridgeNames", [])
+        bridge_names = ", ".join(used_bridge_names) if used_bridge_names else "N/A"
+
+        # Build a preview message
+        preview_message = (
+            f"🚀 Cross-Chain Transfer Preview:\n"
+            f"• From: {from_chain_name} (Chain ID: {from_chain_id})\n"
+            f"• To: {to_chain_name} (Chain ID: {to_chain_id})\n"
+            f"• Amount: {amount} {from_token_symbol}\n"
+            f"• From Token Address: {from_token_address}\n"
+            f"• To Token Address: {to_token_address}\n\n"
+            f"**Available Bridge Routes:**\n{bridge_names}\n\n"
+            "Confirm to proceed with this transaction."
         )
-    except Exception as e:
-        await update.message.reply_text(f"❌ Failed to get migration quote: {str(e)}")
-        return
 
-    if not quote.get("result", {}).get("routes"):
-        await update.message.reply_text("❌ No routes available for the provided parameters.")
-        return
+        # Save pending transaction details
+        pending_transactions[user_id] = {
+            "quote": quote,
+            "wallet": user_wallet,
+            "command_data": command_data
+        }
 
-    # Extract the first route from the quote
-    route = quote["result"]["routes"][0]
-    used_bridge_names = route.get("usedBridgeNames", [])
-    bridge_names = ", ".join(used_bridge_names) if used_bridge_names else "N/A"
+        # Confirmation buttons
+        keyboard = [[
+            InlineKeyboardButton("✅ Confirm", callback_data="confirm"),
+            InlineKeyboardButton("❌ Cancel", callback_data="cancel")
+        ]]
+        await update.message.reply_text(
+            preview_message,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+    else:
+        user_id = update.message.from_user.id
+        user_wallet = user_wallets.get(user_id, {}).get("address")
+        private_key = user_wallets.get(user_id, {}).get("private_key")
 
-    # Build a preview message
-    preview_message = (
-        f"🚀 Cross-Chain Transfer Preview:\n"
-        f"• From: {from_chain_name} (Chain ID: {from_chain_id})\n"
-        f"• To: {to_chain_name} (Chain ID: {to_chain_id})\n"
-        f"• Amount: {amount} {from_token_symbol}\n"
-        f"• From Token Address: {from_token_address}\n"
-        f"• To Token Address: {to_token_address}\n\n"
-        f"**Available Bridge Routes:**\n{bridge_names}\n\n"
-        "Confirm to proceed with this transaction."
-    )
+        if not user_wallet:
+            await update.message.reply_text("⚠️ Please create/import a wallet first!")
+            return
 
-    # Save pending transaction details
-    pending_transactions[user_id] = {
-        "quote": quote,
-        "wallet": user_wallet,
-        "command_data": command_data
-    }
+        # Read environment variables to set contract address and RPC URL
+        CONTRACT_ADDRESS = os.getenv("AVAYIELD_CONTRACT_ADDRESS", "0x8B414448de8B609e96bd63Dcf2A8aDbd5ddf7fdd")
+        RPC_URL = os.getenv("AVAX_RPC_URL", "https://api.avax.network/ext/bc/C/rpc")
 
-    # Confirmation buttons
-    keyboard = [[
-        InlineKeyboardButton("✅ Confirm", callback_data="confirm"),
-        InlineKeyboardButton("❌ Cancel", callback_data="cancel")
-    ]]
-    await update.message.reply_text(
-        preview_message,
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
-    )
+        print("Initializing AvaYield Strategy Interactor...")
+
+        # Create AvaYield Interactor object
+        strategy = AvaYieldInteractor(
+            rpc_url=RPC_URL,
+            contract_address=CONTRACT_ADDRESS,
+            private_key=private_key
+        )
+        if action == "get_pool_deposits":
+            try:
+                # Fetch wallet AVAX balance
+                balance_wei = strategy.w3.eth.get_balance(strategy.account.address)
+                balance_avax = Web3.from_wei(balance_wei, "ether")
+
+                # Fetch the total deposits in the AvaYield strategy
+                total_deposits = strategy.get_pool_deposits()
+
+                # Generate interactive message
+                response_message = (
+                    f"💰 **AvaYield Strategy Overview** 💰\n\n"
+                    f"• **Wallet Address:** `{user_wallet}`\n"
+                    f"• **Wallet Balance:** {balance_avax:.4f} AVAX\n"
+                    f"• **Total Deposits in Strategy:** {total_deposits:.4f} AVAX\n"
+                )
+
+                await update.message.reply_text(response_message, parse_mode="Markdown")
+
+            except Exception as e:
+                print(f"\nError occurred: {str(e)}")
+                await update.message.reply_text(f"❌ Error fetching AvaYield data: {str(e)}")
+        elif action == "get_pool_rewards":
+            try:
+                # Check current rewards
+                rewards = strategy.get_pool_rewards()
+                print(f"Current Rewards: {rewards} AVAX")
+
+                # Generate interactive message
+                response_message = (
+                    f"💰 **AvaYield Strategy Rewards** 💰\n\n"
+                    f"• **Wallet Address:** `{user_wallet}`\n"
+                    f"• **Current Rewards:** {rewards:.3f} AVAX 🏆\n"
+                )
+                await update.message.reply_text(response_message, parse_mode="Markdown")
+            except Exception as e:
+                print(f"\nError occurred: {str(e)}")
+                await update.message.reply_text(f"❌ Error fetching AvaYield rewards: {str(e)}")
+        elif action == "get_leverage":
+            try:
+                # Check current leverage
+                leverage = strategy.get_leverage()
+                print(f"Current Leverage: {leverage}x")
+
+                # Generate interactive message
+                response_message = (
+                    f"💰 **AvaYield Strategy Leverage** 💰\n\n"
+                    f"• **Wallet Address:** `{user_wallet}`\n"
+                    f"• **Current Leverage:** {leverage:.4f}x 🔥\n"
+                )
+                await update.message.reply_text(response_message, parse_mode="Markdown")
+            except Exception as e:
+                print(f"\nError occurred: {str(e)}")
+                await update.message.reply_text(f"❌ Error fetching AvaYield leverage: {str(e)}")
+        elif action == 'get_my_balance':
+            try:
+                # Check user balance
+                user_balance = strategy.w3.eth.get_balance(strategy.account.address)
+                print(f"\nWallet Balance: {Web3.from_wei(user_balance, 'ether')} AVAX")
+
+                # Generate interactive message
+                response_message = (
+                    f"💰 **AvaYield User Balance** 💰\n\n"
+                    f"• **Wallet Address:** `{user_wallet}`\n"
+                    f"• **Your Balance:** {Web3.from_wei(user_balance, 'ether'):.3f} shares 🚀\n"
+                )
+                await update.message.reply_text(response_message, parse_mode="Markdown")
+            except Exception as e:
+                print(f"\nError occurred: {str(e)}")
+                await update.message.reply_text(f"❌ Error fetching AvaYield user balance: {str(e)}")
+        elif action == 'get_my_rewards':
+            try:
+                # Check user rewards
+                user_rewards = strategy.get_my_rewards()
+                print(f"User Rewards: {Web3.from_wei(user_rewards, 'ether')} AVAX")
+                # Generate interactive message
+                response_message = (
+                    f"💰 **AvaYield User Rewards** 💰\n\n"
+                    f"• **Wallet Address:** `{user_wallet}`\n"
+                    f"• **Your Rewards:** {Web3.from_wei(user_rewards, 'ether'):.3f} AVAX 🏆\n"
+                )
+                await update.message.reply_text(response_message, parse_mode="Markdown")
+            except Exception as e:
+                print(f"\nError occurred: {str(e)}")
+                await update.message.reply_text(f"❌ Error fetching AvaYield user rewards: {str(e)}")
+        elif action == 'check_apr':
+            try:
+                # Check APR
+                apr = strategy.get_apr()
+                print(f"\nEstimated APR: {apr:.3f}%")
+                # Generate interactive message
+                response_message = (
+                    f"💰 **AvaYield Estimated APR** 💰\n\n"
+                    f"• **Wallet Address:** `{user_wallet}`\n"
+                    f"• **Estimated APR:** {apr:.3f}% 💸\n"
+                )
+                await update.message.reply_text(response_message, parse_mode="Markdown")
+            except Exception as e:
+                print(f"\nError occurred: {str(e)}")
+                await update.message.reply_text(f"❌ Error fetching AvaYield APR: {str(e)}")
+        elif action == 'deposits':
+            amount_avax = command_data.get('amount_avax') # 假设用户输入的是金额
+            if not amount_avax:
+                await update.message.reply_text("❌ Please provide the amount of AVAX to deposit.")
+                return
+
+            print(f"\n--- Depositing {amount_avax} AVAX ---")
+
+            # Fetch current balance
+            balance_before = strategy.w3.eth.get_balance(strategy.account.address)
+            balance_before_avax = Web3.from_wei(balance_before, 'ether')
+
+            # Build a preview message
+            preview_message = (
+                f"🚀 AVAX Deposit Preview:\n"
+                f"• Amount to Deposit: {amount_avax} AVAX\n"
+                f"• Current Balance: {balance_before_avax:.3f} AVAX\n\n"
+                "Confirm to proceed with this deposit."
+            )
+
+            # Embed deposit data into callback data
+            callback_data_confirm = f"confirm_deposit:{amount_avax}:{balance_before}"
+            callback_data_cancel = "cancel_deposit"
+
+            # Confirmation buttons
+            keyboard = [[
+                InlineKeyboardButton("✅ Confirm", callback_data=callback_data_confirm),
+                InlineKeyboardButton("❌ Cancel", callback_data=callback_data_cancel)
+            ]]
+            await update.message.reply_text(
+                preview_message,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
+            )
+        elif action == 'reinvest_rewards':
+            print("\n--- Reinvesting Rewards ---")
+            # Fetch pending rewards
+            rewards = strategy.get_my_rewards()
+            min_reinvest = Web3.from_wei(strategy.contract.functions.MIN_TOKENS_TO_REINVEST().call(), 'ether')
+
+            if rewards >= min_reinvest:
+                # Build a preview message
+                preview_message = (
+                    f"🚀 Reinvest Rewards Preview:\n"
+                    f"• Pending Rewards: {rewards} AVAX\n"
+                    f"• Minimum Required: {min_reinvest:.3f} AVAX\n\n"
+                    "Confirm to proceed with reinvestment."
+                )
+
+                # Confirmation buttons
+                keyboard = [[
+                    InlineKeyboardButton("✅ Confirm", callback_data="confirm_reinvest"),
+                    InlineKeyboardButton("❌ Cancel", callback_data="cancel_reinvest")
+                ]]
+                await update.message.reply_text(
+                    preview_message,
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode="Markdown"
+                )
+            else:
+                print(f"Not enough rewards to reinvest. Need at least {min_reinvest} AVAX.")
+                await update.message.reply_text(f"❌ Not enough rewards to reinvest. Need at least {min_reinvest} AVAX.")
+        elif action == 'withdraw_rewards':
+            print("\n--- Withdrawing Only Rewards ---")
+            # Fetch pending rewards
+            rewards = strategy.get_my_rewards()  # Get user's pending rewards in AVAX
+            if rewards > 0:
+                # Build a preview message
+                preview_message = (
+                    f"🚀 Withdraw Rewards Preview:\n"
+                    f"• Pending Rewards: {rewards:.3f} AVAX\n\n"
+                    "Confirm to proceed with withdrawal."
+                )
+
+                # Confirmation buttons
+                keyboard = [[
+                    InlineKeyboardButton("✅ Confirm", callback_data="confirm_withdraw"),
+                    InlineKeyboardButton("❌ Cancel", callback_data="cancel_withdraw")
+                ]]
+                await update.message.reply_text(
+                    preview_message,
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode="Markdown"
+                )
+            else:
+                print("No rewards available to withdraw.")
+                await update.message.reply_text("❌ No rewards available to withdraw.")
+        elif action == 'withdraw_partial':
+            # Extract the percentage of shares to withdraw
+            percentage = command_data.get("percentage")
+            if not percentage:
+                await update.message.reply_text("❌ Please provide the percentage of shares to withdraw.")
+                return
+
+            # Fetch the user's current shares
+            user_shares = Decimal(strategy.get_my_balance())
+
+            if user_shares > 0:
+                # Calculate the withdrawal amount
+                withdraw_amount = user_shares * Decimal(percentage) / Decimal(100)
+
+                # Build a preview message
+                preview_message = (
+                    f"🚀 Withdraw Shares Preview:\n"
+                    f"• Total Shares: {user_shares}\n"
+                    f"• Percentage to Withdraw: {percentage}%\n"
+                    f"• Amount to Withdraw: {withdraw_amount:.3f} AVAX\n\n"
+                    "Confirm to proceed with withdrawal."
+                )
+
+                keyboard = [[
+                    InlineKeyboardButton("✅ Confirm", callback_data=f"confirm_withdraw_shares:{percentage}"),
+                    InlineKeyboardButton("❌ Cancel", callback_data="cancel_withdraw_shares")
+                ]]
+                await update.message.reply_text(
+                    preview_message,
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode="Markdown"
+                )
+            else:
+                print("No shares to withdraw.")
+                await update.message.reply_text("❌ No shares to withdraw.")
+        elif action == 'withdraw_everything':
+            print("\n--- Withdrawing Everything ---")
+            # Fetch user's rewards and shares
+            rewards = strategy.get_my_rewards()
+            user_shares = Decimal(strategy.get_my_balance())
+
+            preview_message = (
+                f"🚀 Withdraw Everything Preview:\n"
+                f"• Pending Rewards: {rewards} AVAX\n"
+                f"• Total Shares: {user_shares:.3f}\n\n"
+                "Confirm to proceed with reinvesting rewards and withdrawing all shares."
+            )
+
+            keyboard = [[
+                InlineKeyboardButton("✅ Confirm", callback_data="confirm_withdraw_all"),
+                InlineKeyboardButton("❌ Cancel", callback_data="cancel_withdraw_all")
+            ]]
+            await update.message.reply_text(
+                preview_message,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
+            )
+
+
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.from_user.id
     await query.answer()
 
-    if user_id not in pending_transactions:
-        await query.edit_message_text("⚠️ Transaction expired. Please start over.")
-        return
-
     if query.data == "cancel":
+        if user_id not in pending_transactions:
+            await query.edit_message_text("⚠️ Transaction expired. Please start over.")
+            return
         pending_transactions.pop(user_id)
         await query.edit_message_text("❌ Transaction cancelled.")
         return
+    if query.data == "confirm":
+        if user_id not in pending_transactions:
+            await query.edit_message_text("⚠️ Transaction expired. Please start over.")
+            return
+        # Execute the transaction
+        pending = pending_transactions.pop(user_id)
+        private_key = user_wallets[user_id]["private_key"]
+        route = pending["quote"]["result"]["routes"][0]
 
-    # Execute the transaction
-    pending = pending_transactions.pop(user_id)
-    private_key = user_wallets[user_id]["private_key"]
-    route = pending["quote"]["result"]["routes"][0]
+        try:
+            tx_hash = await execute_transaction(user_id, route, private_key, user_wallets)
+            message = (
+                f"✅ Transaction submitted successfully!\n"
+                f"Hash: {tx_hash}\n"
+                f"Track on: https://www.socketscan.io/tx/{tx_hash}"
+            )
+        except Exception as e:
+            message = f"❌ Transaction failed: {str(e)}"
 
-    try:
-        tx_hash = await execute_transaction(user_id, route, private_key, user_wallets)
-        message = (
-            f"✅ Transaction submitted successfully!\n"
-            f"Hash: {tx_hash}\n"
-            f"Track on: https://www.socketscan.io/tx/{tx_hash}"
-        )
-    except Exception as e:
-        message = f"❌ Transaction failed: {str(e)}"
+        await query.edit_message_text(message)
+    
+    # Read environment variables to set contract address and RPC URL
+    CONTRACT_ADDRESS = os.getenv("AVAYIELD_CONTRACT_ADDRESS", "0x8B414448de8B609e96bd63Dcf2A8aDbd5ddf7fdd")
+    RPC_URL = os.getenv("AVAX_RPC_URL", "https://api.avax.network/ext/bc/C/rpc")
+    # Create AvaYield Interactor object
+    strategy = AvaYieldInteractor(
+        rpc_url=RPC_URL,
+        contract_address=CONTRACT_ADDRESS,
+        private_key=user_wallets[user_id]["private_key"]
+    )
+    if query.data == "cancel_deposit":
+        await query.edit_message_text("❌ Deposit cancelled.")
+        return
+    # Handle deposit confirmation
+    if query.data.startswith("confirm_deposit:"):
+    # Extract amount and balance from callback data
+        _, amount_avax, balance_before = query.data.split(":")
+        balance_before = int(balance_before)
+        # Deposit AVAX into the strategy
+        print(f"\n--- Depositing {amount_avax} AVAX ---")
+        try:
+            receipt = strategy.deposit(Decimal(amount_avax))
+            if receipt:
+                print(f"Deposit successful! Transaction hash: {receipt['transactionHash'].hex()}")
+            else:
+                raise Exception("Deposit failed.")
 
-    await query.edit_message_text(message)
+            time.sleep(10)  # Wait for confirmation
 
+            balance_after = strategy.w3.eth.get_balance(strategy.account.address)
+            difference = Web3.from_wei(balance_before - balance_after, 'ether')
+            print(f"Balance change after deposit: {difference} AVAX (includes gas fees)")
+            print("--------------------------------\n")
+
+            # Send success message to the user
+            message = (
+                f"✅ Deposit successful!\n"
+                f"Transaction hash: {receipt['transactionHash'].hex()}\n"
+                f"Track on: https://www.snowtrace.io/tx/{receipt['transactionHash'].hex()}\n"
+                f"Balance change: {difference:.3f} AVAX (includes gas fees)"
+            )
+        except Exception as e:
+            message = f"❌ Deposit failed: {str(e)}"
+
+        await query.edit_message_text(message)
+
+    # Handle cancel operation
+    if query.data == "cancel_reinvest":
+        await query.edit_message_text("❌ Reinvestment canceled.")
+        return
+
+    # Handle reinvest confirmation
+    if query.data == "confirm_reinvest":
+        # Fetch pending rewards
+        rewards = strategy.get_my_rewards()
+
+        # Execute reinvestment
+        print(f"Reinvesting {rewards} AVAX...")
+        try:
+            strategy.reinvest()
+            time.sleep(10)  # Wait for transaction confirmation
+            new_rewards = strategy.get_my_rewards()
+            print(f"Rewards after reinvest: {new_rewards} AVAX (should be 0 or near 0)")
+
+            # Send success message to the user
+            message = f"✅ Reinvestment successful! New rewards: {new_rewards} AVAX"
+        except Exception as e:
+            message = f"❌ Reinvestment failed: {str(e)}"
+
+        await query.edit_message_text(message)
+
+    if query.data == "cancel_withdraw":
+        await query.edit_message_text("❌ Withdrawal canceled.")
+        return
+
+    if query.data == "confirm_withdraw":
+        # Fetch pending rewards
+        rewards = strategy.get_my_rewards()
+
+        # Execute withdrawal
+        print(f"Attempting to withdraw {rewards} AVAX directly...")
+        try:
+            receipt = strategy.withdraw(rewards)  # Attempt direct AVAX withdrawal
+            if receipt:
+                print(f"Withdrawal successful! Transaction hash: {receipt['transactionHash'].hex()}")
+
+                # Send success message to the user
+                message = f"✅ Withdrawal successful! Transaction hash: {receipt['transactionHash'].hex()}"
+            else:
+                raise Exception("Withdrawal failed! Check contract requirements.")
+        except Exception as e:
+            message = f"❌ Withdrawal failed: {str(e)}"
+
+        await query.edit_message_text(message)
+
+    if query.data == "cancel_withdraw_shares":
+        await query.edit_message_text("❌ Withdrawal canceled.")
+        return
+
+    if query.data.startswith("confirm_withdraw_shares:"):
+        percentage = query.data.split(":")[1]
+
+        user_shares = Decimal(strategy.get_my_balance())
+
+        withdraw_amount = user_shares * Decimal(percentage) / Decimal(100)
+
+        print(f"\n--- Withdrawing {percentage}% of Shares ---")
+        print(f"Withdrawing {withdraw_amount} AVAX ({percentage}% of total)...")
+        try:
+            strategy.withdraw(withdraw_amount)
+            time.sleep(10)  # Wait for transaction confirmation
+
+            message = f"✅ Withdrawal successful! {withdraw_amount} AVAX withdrawn."
+        except Exception as e:
+            message = f"❌ Withdrawal failed: {str(e)}"
+
+        await query.edit_message_text(message)
+
+    if query.data == "confirm_withdraw_all":
+        # Step 1: Reinvest rewards (if any)
+        rewards = strategy.get_my_rewards()
+        if rewards > 0:
+            print("Reinvesting rewards before withdrawal...")
+            try:
+                strategy.reinvest()
+                time.sleep(10)  # Wait for transaction confirmation
+                await query.edit_message_text("✅ Rewards reinvested successfully.")
+            except Exception as e:
+                await query.edit_message_text(f"❌ Rewards reinvestment failed: {str(e)}")
+                return
+
+        # Step 2: Withdraw all shares
+        user_shares = Decimal(strategy.get_my_balance())
+        if user_shares > 0:
+            print(f"Withdrawing all {user_shares} AVAX...")
+            try:
+                strategy.withdraw(user_shares)
+                time.sleep(10)  # Wait for transaction confirmation
+                await query.edit_message_text(f"✅ Full withdrawal successful! {user_shares} AVAX withdrawn.")
+            except Exception as e:
+                await query.edit_message_text(f"❌ Full withdrawal failed: {str(e)}")
+        else:
+            await query.edit_message_text("❌ No shares left to withdraw.")
+
+        print("Withdrawal complete.")
+        print("--------------------------------\n")
+    if query.data == "cancel_withdraw_all":
+        await query.edit_message_text("❌ Withdrawal canceled.")
 # ------------------------------
 # Main Entry Point
 # ------------------------------

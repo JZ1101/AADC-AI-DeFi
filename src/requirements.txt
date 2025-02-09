@@ -1,0 +1,5 @@
+requests
+openai
+web3
+python-telegram-bot
+deepseek
