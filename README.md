@@ -13,8 +13,21 @@ DeFi Position Management
   - 2.3 Implement safety checks and transaction previews before execution
 
 ## Bridges Integrated
-=======
-#### Chains Integrated
+
+| Name   |  Status  |
+|:-----  |:--------:|
+| Across | ✔️ |
+| Celer CBridge| ✔️ |
+| Circle CCTP     | ✔️ |
+| Connext     | ✔️ |
+| Hop     | ✔️ |
+| Hyphen    | ✔️ |
+| Refuel    | ✔️ |
+| Stargate     | ✔️ |
+| Symbiosis     | ✔️ |
+| Synapse     | ✔️ |
+
+## Chains Integrated
 
 | Name   | Status  |  
 |--------|:------:|  
