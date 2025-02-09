@@ -198,13 +198,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ Please create/import a wallet first!")
             return
 
-        # 读取环境变量，设置合约地址和 RPC URL
+        # Read environment variables to set contract address and RPC URL
         CONTRACT_ADDRESS = os.getenv("AVAYIELD_CONTRACT_ADDRESS", "0x8B414448de8B609e96bd63Dcf2A8aDbd5ddf7fdd")
         RPC_URL = os.getenv("AVAX_RPC_URL", "https://api.avax.network/ext/bc/C/rpc")
 
         print("Initializing AvaYield Strategy Interactor...")
 
-        # 创建 AvaYield 交互对象
+        # Create AvaYield Interactor object
         strategy = AvaYieldInteractor(
             rpc_url=RPC_URL,
             contract_address=CONTRACT_ADDRESS,
@@ -212,14 +212,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         if action == "get_pool_deposits":
             try:
-                # 获取钱包 AVAX 余额
+                # Fetch wallet AVAX balance
                 balance_wei = strategy.w3.eth.get_balance(strategy.account.address)
                 balance_avax = Web3.from_wei(balance_wei, "ether")
 
-                # 获取 AvaYield 策略的总存款量
+                # Fetch the total deposits in the AvaYield strategy
                 total_deposits = strategy.get_pool_deposits()
 
-                # 生成交互消息
+                # Generate interactive message
                 response_message = (
                     f"💰 **AvaYield Strategy Overview** 💰\n\n"
                     f"• **Wallet Address:** `{user_wallet}`\n"
@@ -238,7 +238,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 rewards = strategy.get_pool_rewards()
                 print(f"Current Rewards: {rewards} AVAX")
 
-                # 生成交互消息
+                # Generate interactive message
                 response_message = (
                     f"💰 **AvaYield Strategy Rewards** 💰\n\n"
                     f"• **Wallet Address:** `{user_wallet}`\n"
@@ -254,7 +254,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 leverage = strategy.get_leverage()
                 print(f"Current Leverage: {leverage}x")
 
-                # 生成交互消息
+                # Generate interactive message
                 response_message = (
                     f"💰 **AvaYield Strategy Leverage** 💰\n\n"
                     f"• **Wallet Address:** `{user_wallet}`\n"
@@ -270,7 +270,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 user_balance = strategy.w3.eth.get_balance(strategy.account.address)
                 print(f"\nWallet Balance: {Web3.from_wei(user_balance, 'ether')} AVAX")
 
-                # 生成交互消息
+                # Generate interactive message
                 response_message = (
                     f"💰 **AvaYield User Balance** 💰\n\n"
                     f"• **Wallet Address:** `{user_wallet}`\n"
@@ -285,8 +285,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # Check user rewards
                 user_rewards = strategy.get_my_rewards()
                 print(f"User Rewards: {Web3.from_wei(user_rewards, 'ether')} AVAX")
-
-                # 生成交互消息
+                # Generate interactive message
                 response_message = (
                     f"💰 **AvaYield User Rewards** 💰\n\n"
                     f"• **Wallet Address:** `{user_wallet}`\n"
@@ -301,7 +300,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # Check APR
                 apr = strategy.get_apr()
                 print(f"\nEstimated APR: {apr:.3f}%")
-                # 生成交互消息
+                # Generate interactive message
                 response_message = (
                     f"💰 **AvaYield Estimated APR** 💰\n\n"
                     f"• **Wallet Address:** `{user_wallet}`\n"
@@ -331,7 +330,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Confirm to proceed with this deposit."
             )
 
-            # 将存款数据嵌入到回调数据中
+            # Embed deposit data into callback data
             callback_data_confirm = f"confirm_deposit:{amount_avax}:{balance_before}"
             callback_data_cancel = "cancel_deposit"
 
@@ -405,14 +404,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("❌ Please provide the percentage of shares to withdraw.")
                 return
 
-            # 获取用户的当前份额
+            # Fetch the user's current shares
             user_shares = Decimal(strategy.get_my_balance())
 
             if user_shares > 0:
-                # 计算提现金额
+                # Calculate the withdrawal amount
                 withdraw_amount = user_shares * Decimal(percentage) / Decimal(100)
 
-                # 构建预览消息
+                # Build a preview message
                 preview_message = (
                     f"🚀 Withdraw Shares Preview:\n"
                     f"• Total Shares: {user_shares}\n"
@@ -421,7 +420,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "Confirm to proceed with withdrawal."
                 )
 
-                # 确认按钮
                 keyboard = [[
                     InlineKeyboardButton("✅ Confirm", callback_data=f"confirm_withdraw_shares:{percentage}"),
                     InlineKeyboardButton("❌ Cancel", callback_data="cancel_withdraw_shares")
@@ -436,11 +434,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("❌ No shares to withdraw.")
         elif action == 'withdraw_everything':
             print("\n--- Withdrawing Everything ---")
-            # 获取用户的奖励和份额
+            # Fetch user's rewards and shares
             rewards = strategy.get_my_rewards()
             user_shares = Decimal(strategy.get_my_balance())
 
-            # 构建预览消息
             preview_message = (
                 f"🚀 Withdraw Everything Preview:\n"
                 f"• Pending Rewards: {rewards} AVAX\n"
@@ -448,7 +445,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Confirm to proceed with reinvesting rewards and withdrawing all shares."
             )
 
-            # 确认按钮
             keyboard = [[
                 InlineKeyboardButton("✅ Confirm", callback_data="confirm_withdraw_all"),
                 InlineKeyboardButton("❌ Cancel", callback_data="cancel_withdraw_all")
@@ -494,26 +490,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.edit_message_text(message)
     
-        # 读取环境变量，设置合约地址和 RPC URL
-    
+    # Read environment variables to set contract address and RPC URL
     CONTRACT_ADDRESS = os.getenv("AVAYIELD_CONTRACT_ADDRESS", "0x8B414448de8B609e96bd63Dcf2A8aDbd5ddf7fdd")
     RPC_URL = os.getenv("AVAX_RPC_URL", "https://api.avax.network/ext/bc/C/rpc")
-    # 创建 AvaYield 交互对象
+    # Create AvaYield Interactor object
     strategy = AvaYieldInteractor(
         rpc_url=RPC_URL,
         contract_address=CONTRACT_ADDRESS,
         private_key=user_wallets[user_id]["private_key"]
     )
-    # 处理取消操作
     if query.data == "cancel_deposit":
         await query.edit_message_text("❌ Deposit cancelled.")
         return
-    # 处理存款确认
+    # Handle deposit confirmation
     if query.data.startswith("confirm_deposit:"):
-        # 从回调数据中提取金额和余额
+    # Extract amount and balance from callback data
         _, amount_avax, balance_before = query.data.split(":")
         balance_before = int(balance_before)
-
         # Deposit AVAX into the strategy
         print(f"\n--- Depositing {amount_avax} AVAX ---")
         try:
@@ -542,12 +535,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.edit_message_text(message)
 
- # 处理取消操作
+    # Handle cancel operation
     if query.data == "cancel_reinvest":
         await query.edit_message_text("❌ Reinvestment canceled.")
         return
 
-    # 处理复投确认
+    # Handle reinvest confirmation
     if query.data == "confirm_reinvest":
         # Fetch pending rewards
         rewards = strategy.get_my_rewards()
@@ -567,12 +560,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.edit_message_text(message)
 
-    # 处理取消操作
     if query.data == "cancel_withdraw":
         await query.edit_message_text("❌ Withdrawal canceled.")
         return
 
-    # 处理提现确认
     if query.data == "confirm_withdraw":
         # Fetch pending rewards
         rewards = strategy.get_my_rewards()
@@ -593,30 +584,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.edit_message_text(message)
 
-    # 处理取消操作
     if query.data == "cancel_withdraw_shares":
         await query.edit_message_text("❌ Withdrawal canceled.")
         return
 
-    # 处理提现确认
     if query.data.startswith("confirm_withdraw_shares:"):
-        # 从回调数据中提取提现比例
         percentage = query.data.split(":")[1]
 
-        # 获取用户的当前份额
         user_shares = Decimal(strategy.get_my_balance())
 
-        # 计算提现金额
         withdraw_amount = user_shares * Decimal(percentage) / Decimal(100)
 
-        # 执行提现操作
         print(f"\n--- Withdrawing {percentage}% of Shares ---")
         print(f"Withdrawing {withdraw_amount} AVAX ({percentage}% of total)...")
         try:
             strategy.withdraw(withdraw_amount)
             time.sleep(10)  # Wait for transaction confirmation
 
-            # 发送成功消息
             message = f"✅ Withdrawal successful! {withdraw_amount} AVAX withdrawn."
         except Exception as e:
             message = f"❌ Withdrawal failed: {str(e)}"
