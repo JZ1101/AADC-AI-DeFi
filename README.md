@@ -13,19 +13,27 @@ DeFi Position Management
   - 2.3 Implement safety checks and transaction previews before execution
 
 ## Bridges Integrated
+=======
+#### Chains Integrated
 
-| Name   |  Status  |
-|:-----  |:--------:|
-| Across | ✔️ |
-| Celer CBridge| ✔️ |
-| Circle CCTP     | ✔️ |
-| Connext     | ✔️ |
-| Hop     | ✔️ |
-| Hyphen    | ✔️ |
-| Refuel    | ✔️ |
-| Stargate     | ✔️ |
-| Symbiosis     | ✔️ |
-| Synapse     | ✔️ |
+| Name   | Status  |  
+|--------|:------:|  
+| Arbitrum | ✔️ |  
+| Aurora | ✔️ |  
+| Avalanche | ✔️ |  
+| Base | ✔️ |  
+| Binance Smart Chain (BSC) | ✔️ |  
+| Blast | ✔️ |  
+| Ethereum | ✔️ |  
+| Fantom | ✔️ |  
+| Gnosis Chain | ✔️ |  
+| Linea | ✔️ |  
+| Mantle | ✔️ |  
+| Optimism | ✔️ |  
+| Polygon | ✔️ |  
+| Polygon zkEVM | ✔️ |  
+| Scroll | ✔️ |  
+| zkSync Era | ✔️ |  
 
 ## DEX Integrated For Cross Chain Atomic Swap
 
