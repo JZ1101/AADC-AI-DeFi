@@ -89,7 +89,10 @@ BUNGEE_API_KEY  = "72a5b4b0-e727-48be-8aa1-5da9d62fe635" # Use the BUNGEE test k
 ```
 
 ### Step 3: Start test in the telegram bot
-  ```bash
-  cd src
-  uv run bot.py  
-  ```
+```bash
+cd src
+uv run bot.py  
+```
+1. Open the Telegram app and search for your bot using the bot username you created with BotFather.
+2. Start a conversation with your bot by typing `/start`.
+3. Follow the on-screen instructions to interact with the bot and test its functionalities.
