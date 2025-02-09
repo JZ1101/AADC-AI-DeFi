@@ -87,3 +87,9 @@ INFURA_API_KEY = "your-infura-api-key" # Obtain from https://developer.metamask.
 WEB3_PROVIDER = "your-web3-provider" # Obtain from https://developer.metamask.io/ too, but choose the Infura RPC key
 BUNGEE_API_KEY  = "72a5b4b0-e727-48be-8aa1-5da9d62fe635" # Use the BUNGEE test key, Obtain from https://docs.bungee.exchange/bungee-manual/socket-api/introduction
 ```
+
+### Step 3: Start test in the telegram bot
+  ```bash
+  cd src
+  uv run bot.py  
+  ```
