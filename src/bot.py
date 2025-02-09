@@ -42,7 +42,7 @@ pending_transactions = {} # key: Telegram user_id, value: transaction details
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Welcome to the AI Cross-Chain Migration Assistant with Wallet Integration!\n\n"
+        "Welcome to the AI DeFi & Cross-Chain Operations Assistant with Wallet Integration!\n\n"
         "You can manage an EVM-compatible wallet directly here.\n"
         "Commands:\n"
         "/createwallet - Create a new wallet\n"
