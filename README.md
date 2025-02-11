@@ -55,15 +55,6 @@ DeFi Position Management
 | 1inch | ✔️ |
 | 0x | ✔️ |
 
-## DeFi - Yield Farming with BENQI
-
-| Name   |  Status  |
-|:-----  |:--------:|
-| Deposit | ✔️ |
-| Withdraw | ✔️ |
-| Reinvest | ✔️ |
-| Contract Info | ✔️ |
-
 ## 🚀 DeFi - Yield Farming with BENQI
 
 | **Feature**  | **Status** |
