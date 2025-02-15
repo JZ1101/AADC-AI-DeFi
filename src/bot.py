@@ -3,7 +3,7 @@ import os
 import time
 from decimal import Decimal
 import asyncio
-from deepseek import DeepSeekAPI
+import requests
 from web3 import Web3
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -87,6 +87,53 @@ async def wallet_details_handler(update: Update, context: ContextTypes.DEFAULT_T
     await update.message.reply_text(
         f"Your Wallet Details:\nAddress: {wallet['address']}\nBalance: {balance} ETH"
     )
+
+import os
+import requests
+import subprocess
+
+async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+
+    # Download voice file from Telegram
+    voice_file = await context.bot.get_file(update.message.voice.file_id)
+    voice_path = f"voice_message_{user_id}.ogg"
+    mp3_path = f"voice_message_{user_id}.mp3"
+    
+    await voice_file.download(voice_path)
+
+    # Convert OGG to MP3 using subprocess (safer than os.system)
+    try:
+        subprocess.run(["ffmpeg", "-i", voice_path, mp3_path, "-y"], check=True)
+    except subprocess.CalledProcessError as e:
+        await update.message.reply_text("❌ Audio conversion failed.")
+        return
+
+    # Send MP3 file to OpenAI Whisper API
+    with open(mp3_path, "rb") as audio_file:
+        response = requests.post(
+            "https://api.openai.com/v1/audio/transcriptions",
+            headers={"Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}"},
+            files={"file": audio_file},
+            data={"model": "whisper-1"}
+        )
+
+    # Delete local audio files after processing
+    os.remove(voice_path)
+    os.remove(mp3_path)
+
+    # Check API response
+    if response.status_code == 200:
+        transcribed_text = response.json().get("text", "").strip()
+        if transcribed_text:
+            # Simulate a text command for the bot
+            update.message.text = transcribed_text
+            await handle_message(update, context)  # Reuse text handling logic
+        else:
+            await update.message.reply_text("⚠️ Could not transcribe the voice message.")
+    else:
+        await update.message.reply_text("❌ Failed to process audio. Try again.")
+
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
@@ -650,6 +697,8 @@ def main():
     application.add_handler(CommandHandler("importwallet", import_wallet_handler))
     application.add_handler(CommandHandler("wallet", wallet_details_handler))
     
+    # Voice message handling
+    application.add_handler(MessageHandler(filters.VOICE, handle_voice_message))
     # Cross-chain migration command.
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(button_handler))
