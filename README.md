@@ -1,6 +1,6 @@
 # AI Engine 2025
 # AI Agents for DeFi & Cross-Chain Operations
-## This project is based on previous work which allowed Defi and cross chain operations. 
+## Main Development started on Feb 8, 202 
 ## The project has been extended to include voice commands and a more user friendly interface. 
 Cross-Chain Migration Assistant
   - 1.1 Develop an AI agent that simplifies moving assets across chains through **natural language commands**
