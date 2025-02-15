@@ -1,7 +1,7 @@
-# ETH-Oxford-2025
+# AI Engine 2025
 # AI Agents for DeFi & Cross-Chain Operations
-## Sponsored by Avalanche
-### Achieved features: 
+## Main Development started on Feb 8, 202 
+## The project has been extended to include voice commands and a more user friendly interface. 
 Cross-Chain Migration Assistant
   - 1.1 Develop an AI agent that simplifies moving assets across chains through **natural language commands**
   - 1.2 Automate the complete bridging and swapping process
