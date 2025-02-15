@@ -88,51 +88,77 @@ async def wallet_details_handler(update: Update, context: ContextTypes.DEFAULT_T
         f"Your Wallet Details:\nAddress: {wallet['address']}\nBalance: {balance} ETH"
     )
 
-import os
-import requests
-import subprocess
 
 async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-
-    # Download voice file from Telegram
-    voice_file = await context.bot.get_file(update.message.voice.file_id)
-    voice_path = f"voice_message_{user_id}.ogg"
-    mp3_path = f"voice_message_{user_id}.mp3"
-    
-    await voice_file.download(voice_path)
-
-    # Convert OGG to MP3 using subprocess (safer than os.system)
     try:
-        subprocess.run(["ffmpeg", "-i", voice_path, mp3_path, "-y"], check=True)
-    except subprocess.CalledProcessError as e:
-        await update.message.reply_text("❌ Audio conversion failed.")
-        return
-
-    # Send MP3 file to OpenAI Whisper API
-    with open(mp3_path, "rb") as audio_file:
-        response = requests.post(
-            "https://api.openai.com/v1/audio/transcriptions",
-            headers={"Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}"},
-            files={"file": audio_file},
-            data={"model": "whisper-1"}
-        )
-
-    # Delete local audio files after processing
-    os.remove(voice_path)
-    os.remove(mp3_path)
-
-    # Check API response
-    if response.status_code == 200:
-        transcribed_text = response.json().get("text", "").strip()
-        if transcribed_text:
-            # Simulate a text command for the bot
-            update.message.text = transcribed_text
-            await handle_message(update, context)  # Reuse text handling logic
-        else:
-            await update.message.reply_text("⚠️ Could not transcribe the voice message.")
-    else:
-        await update.message.reply_text("❌ Failed to process audio. Try again.")
+        # Get the voice message file
+        voice_file = await context.bot.get_file(update.message.voice.file_id)
+        voice_path = f"voice_message_{update.message.from_user.id}.ogg"
+        
+        try:
+            # Download the voice file
+            await voice_file.download_to_drive(voice_path)
+            
+            # Send OGG file to OpenAI Whisper API
+            with open(voice_path, "rb") as audio_file:
+                response = requests.post(
+                    "https://api.openai.com/v1/audio/transcriptions",
+                    headers={"Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}"},
+                    files={"file": audio_file},
+                    data={"model": "whisper-1"},
+                    timeout=30
+                )
+            
+            if response.status_code == 200:
+                transcribed_text = response.json().get("text", "").strip()
+                if transcribed_text:
+                    # Inform the user what was transcribed
+                    await update.message.reply_text(f"🗣 Voice message transcribed: {transcribed_text}")
+                    
+                    # Get the original message's date as a Unix timestamp
+                    date_timestamp = int(update.message.date.timestamp())
+                    
+                    # Create message dictionary with proper date format
+                    message_dict = {
+                        "message_id": update.message.message_id,
+                        "date": date_timestamp,  # Use Unix timestamp
+                        "chat": update.message.chat.to_dict(),
+                        "from": update.message.from_user.to_dict(),
+                        "text": transcribed_text
+                    }
+                    
+                    # Create a new Update object with the proper message format
+                    new_update = Update.de_json(
+                        {
+                            "update_id": update.update_id,
+                            "message": message_dict
+                        },
+                        context.bot
+                    )
+                    
+                    # Process the transcribed text as a command
+                    await handle_message(new_update, context)
+                else:
+                    await update.message.reply_text("⚠️ No text was detected in the voice message.")
+            else:
+                error_msg = response.json().get("error", {}).get("message", "Unknown error")
+                await update.message.reply_text(f"❌ Transcription failed: {error_msg}")
+                
+        except requests.exceptions.Timeout:
+            await update.message.reply_text("❌ Request timed out. Please try again.")
+        except requests.exceptions.RequestException as e:
+            await update.message.reply_text(f"❌ Network error occurred: {str(e)}")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Error processing voice message: {str(e)}")
+            print(f"Debug - Error details: {str(e)}")  # Added debug print
+            
+    finally:
+        # Clean up the temporary file
+        if 'voice_path' in locals() and os.path.exists(voice_path):
+            try:
+                os.remove(voice_path)
+            except Exception as e:
+                print(f"Warning: Could not remove temporary file {voice_path}: {str(e)}")
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
