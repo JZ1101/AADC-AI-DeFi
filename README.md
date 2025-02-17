@@ -1,4 +1,3 @@
-# AI Engine 2025
 # AI Agents for DeFi & Cross-Chain Operations
 ## Main Development started on Feb 8, 202 
 ## The project has been extended to include voice commands and a more user friendly interface. 
